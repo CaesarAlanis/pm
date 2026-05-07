@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -16,6 +16,8 @@ import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
 import { fetchBoard, saveBoard, sendChatMessage, type ChatMessage } from "@/lib/api";
 
+type LocalChatMessage = ChatMessage & { id: string };
+
 type KanbanBoardProps = {
   username: string;
 };
@@ -25,7 +27,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatMessages, setChatMessages] = useState<LocalChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
@@ -35,6 +37,8 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
       activationConstraint: { distance: 6 },
     })
   );
+
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cardsById = useMemo(() => (board ? board.cards : {}), [board]);
 
@@ -46,7 +50,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
         const fetchedBoard = await fetchBoard(username);
         const nextBoard = fetchedBoard.columns.length > 0 ? fetchedBoard : initialData;
         if (fetchedBoard.columns.length === 0) {
-          void saveBoard(username, nextBoard);
+          await saveBoard(username, nextBoard);
         }
         if (mounted) {
           setBoard(nextBoard);
@@ -79,13 +83,18 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
     }
   };
 
-  const updateBoard = (updater: (prev: BoardData) => BoardData) => {
+  const updateBoard = (updater: (prev: BoardData) => BoardData, { debounce = false }: { debounce?: boolean } = {}) => {
     setBoard((prev) => {
       if (!prev) {
         return prev;
       }
       const nextBoard = updater(prev);
-      void saveCurrentBoard(nextBoard);
+      if (debounce) {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => void saveCurrentBoard(nextBoard), 400);
+      } else {
+        void saveCurrentBoard(nextBoard);
+      }
       return nextBoard;
     });
   };
@@ -114,7 +123,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
       columns: prev.columns.map((column) =>
         column.id === columnId ? { ...column, title } : column
       ),
-    }));
+    }), { debounce: true });
   };
 
   const handleAddCard = (columnId: string, title: string, details: string) => {
@@ -123,7 +132,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
       ...prev,
       cards: {
         ...prev.cards,
-        [id]: { id, title, details: details || "No details yet." },
+        [id]: { id, title, details },
       },
       columns: prev.columns.map((column) =>
         column.id === columnId
@@ -161,7 +170,10 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
       return;
     }
 
-    const nextConversation = [...chatMessages, { role: "user", content: nextMessage } as const];
+    const nextConversation: LocalChatMessage[] = [
+      ...chatMessages,
+      { role: "user" as const, content: nextMessage, id: createId("msg") },
+    ];
     setChatMessages(nextConversation);
     setChatInput("");
     setChatError(null);
@@ -169,7 +181,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
 
     try {
       const response = await sendChatMessage(board, chatMessages, nextMessage);
-      setChatMessages((prev) => [...prev, { role: "assistant", content: response.message }]);
+      setChatMessages((prev) => [...prev, { role: "assistant", content: response.message, id: createId("msg") }]);
       if (response.boardUpdate) {
         setBoard(response.boardUpdate);
         await saveCurrentBoard(response.boardUpdate);
@@ -265,7 +277,7 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
                 <KanbanColumn
                   key={column.id}
                   column={column}
-                  cards={column.cardIds.map((cardId) => board.cards[cardId])}
+                  cards={column.cardIds.map((cardId) => board.cards[cardId]).filter(Boolean)}
                   onRename={handleRenameColumn}
                   onAddCard={handleAddCard}
                   onDeleteCard={handleDeleteCard}
@@ -302,9 +314,9 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
                   Ask for card edits or moves, for example: move all review tasks to done.
                 </p>
               ) : null}
-              {chatMessages.map((message, index) => (
+              {chatMessages.map((message) => (
                 <div
-                  key={`${message.role}-${index}`}
+                  key={message.id}
                   className={
                     message.role === "user"
                       ? "self-end rounded-2xl bg-[var(--primary-blue)] px-4 py-3 text-sm text-white"
@@ -314,6 +326,11 @@ export const KanbanBoard = ({ username }: KanbanBoardProps) => {
                   {message.content}
                 </div>
               ))}
+              {chatLoading ? (
+                <p className="self-start rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm italic text-[var(--gray-text)]">
+                  Thinking...
+                </p>
+              ) : null}
             </div>
 
             {chatError ? (

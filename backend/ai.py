@@ -66,7 +66,7 @@ async def ask_openrouter(messages: list[dict[str, str]]) -> str:
     }
 
     errors: list[str] = []
-    async with httpx.AsyncClient(timeout=12.0) as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         for model_name in get_model_names():
             payload: dict[str, Any] = {
                 "model": model_name,

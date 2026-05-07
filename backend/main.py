@@ -1,4 +1,5 @@
 import json
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
@@ -15,6 +16,8 @@ from pydantic import model_validator
 
 from backend import ai
 from backend import db
+
+logger = logging.getLogger(__name__)
 
 project_root = Path(__file__).resolve().parent.parent
 load_dotenv(project_root / ".env")
@@ -111,6 +114,7 @@ def _validated_board_or_default(board_data: dict[str, Any] | None) -> BoardModel
     try:
         return BoardModel.model_validate(board_data)
     except ValidationError:
+        logger.warning("Stored board failed Pydantic validation; returning default board. Data: %s", board_data)
         return BoardModel.model_validate(db.DEFAULT_BOARD)
 
 
@@ -162,9 +166,13 @@ async def chat(payload: ChatRequest) -> ChatResponse:
 
     try:
         raw_answer = await ai.ask_openrouter(messages)
-        parsed = _extract_json_object(raw_answer)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"AI request failed: {exc}") from exc
+
+    try:
+        parsed = _extract_json_object(raw_answer)
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="AI returned a non-JSON response") from exc
 
     message = parsed.get("message")
     if not isinstance(message, str) or not message.strip():

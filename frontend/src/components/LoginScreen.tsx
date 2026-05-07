@@ -17,7 +17,7 @@ export const LoginScreen = ({ onLogin }: LoginScreenProps) => {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalizedUsername = username.trim().toLowerCase();
-    const normalizedPassword = password.trim();
+    const normalizedPassword = password;
 
     if (normalizedUsername === validUsername && normalizedPassword === validPassword) {
       setError("");

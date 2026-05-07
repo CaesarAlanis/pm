@@ -22,11 +22,11 @@ uvicorn backend.main:app --reload --port 8000
 ```
 
 ### Backend tests
+Run from the **project root** (so the `backend` package is importable):
 ```bash
-cd backend
-python -m pytest tests/
+python -m unittest discover -s backend/tests -v
 # or a single test:
-python -m pytest tests/test_backend.py::BackendPersistenceTests::test_health_endpoint
+python -m unittest backend.tests.test_backend.BackendPersistenceTests.test_health_endpoint
 ```
 
 ### Frontend development

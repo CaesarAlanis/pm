@@ -36,14 +36,14 @@ describe("LoginScreen", () => {
     expect(onLogin).toHaveBeenCalled();
   });
 
-  it("accepts valid credentials with extra whitespace and username casing differences", async () => {
+  it("accepts valid credentials with username whitespace and casing", async () => {
     const onLogin = vi.fn();
     const user = userEvent.setup();
 
     render(<LoginScreen onLogin={onLogin} />);
 
     await user.type(screen.getByPlaceholderText(/user/i), " User ");
-    await user.type(screen.getByPlaceholderText(/password/i), " password ");
+    await user.type(screen.getByPlaceholderText(/password/i), "password");
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     expect(onLogin).toHaveBeenCalled();

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m unittest discover -s tests -v)",
+      "Bash(npm run *)",
+      "Bash(open -a Docker)",
+      "Bash(docker info *)",
+      "Bash(osascript -e 'quit app \"Docker Desktop\"')",
+      "Bash(git -C /Users/eppo.luiken/Projects/pm add CLAUDE.md)",
+      "Bash(git -C /Users/eppo.luiken/Projects/pm commit -m \"Added CLAUDE.MD\")",
+      "Bash(git *)",
+      "Bash(npm test *)",
+      "Bash(./scripts/stop.sh)",
+      "Bash(code --version)"
+    ]
+  }
+}
