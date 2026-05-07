@@ -10,7 +10,9 @@
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
+    "pretest:e2e": "node -e \"require('child_process').spawnSync('docker',['rm','-f','pm-app-e2e'],{stdio:'ignore'})\"",
     "test:e2e": "playwright test",
+    "posttest:e2e": "node -e \"require('child_process').spawnSync('docker',['rm','-f','pm-app-e2e'],{stdio:'ignore'})\"",
     "test:all": "npm run test:unit && npm run test:e2e"
   },
   "dependencies": {
@@ -18,7 +20,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "clsx": "^2.1.1",
-    "next": "16.1.6",
+    "next": "^16.2.4",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
@@ -34,10 +36,13 @@
     "@vitejs/plugin-react": "^5.1.2",
     "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.2.4",
     "jsdom": "^27.0.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "postcss": "^8.5.14"
   }
 }
