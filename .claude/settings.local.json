@@ -11,7 +11,11 @@
       "Bash(git *)",
       "Bash(npm test *)",
       "Bash(./scripts/stop.sh)",
-      "Bash(code --version)"
+      "Bash(code --version)",
+      "Bash(docker compose *)",
+      "Bash(osascript *)",
+      "Skill(update-config)",
+      "Skill(ralph-loop:ralph-loop)"
     ]
   }
 }

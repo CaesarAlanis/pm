@@ -15,9 +15,9 @@ A Kanban project management app with an AI chat sidebar. One board per user, har
 ```
 
 ### Backend development (without Docker)
+Run all commands from the **project root**:
 ```bash
-cd backend
-pip install -e .
+pip install -e backend/
 uvicorn backend.main:app --reload --port 8000
 ```
 
@@ -38,9 +38,10 @@ npm run dev          # starts Next.js dev server on :3000
 
 Set `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api` in `frontend/.env.local` when running frontend dev server against a local backend.
 
-### Frontend tests
+### Frontend lint and tests
 ```bash
 cd frontend
+npm run lint         # ESLint
 npm test             # unit tests via vitest
 npm run test:e2e     # Playwright e2e (builds Docker image first)
 ```
@@ -62,8 +63,8 @@ backend/
 
 frontend/src/
   app/page.tsx           root page: login gate, passes username to KanbanBoard
-  components/            KanbanBoard, KanbanColumn, KanbanCard, LoginScreen, NewCardForm
-  lib/kanban.ts          BoardData types and moveCard logic (pure functions)
+  components/            KanbanBoard, KanbanColumn, KanbanCard, KanbanCardPreview, LoginScreen, NewCardForm
+  lib/kanban.ts          BoardData types, moveCard logic, createId (pure functions)
   lib/api.ts             fetch wrappers for /api/board and /api/chat
 ```
 
@@ -72,6 +73,13 @@ frontend/src/
 - Board state lives in the frontend (`KanbanBoard`) and is synced to `POST /api/board/{username}` on every change.
 - The AI chat (`POST /api/chat`) receives the full board JSON plus conversation history and returns `{ message, boardUpdate }`. If `boardUpdate` is non-null and valid, the frontend replaces its board state with it.
 - `BoardModel` in `main.py` validates that every `cardId` referenced by a column actually exists in `cards` — invalid AI responses are silently dropped.
+- `ai.py` tries each model in `OPENROUTER_MODEL` (or the default list) in sequence, falling back on any error.
+
+### Frontend patterns
+
+- Drag-and-drop uses `@dnd-kit/core` with `closestCorners` collision detection. `KanbanCardPreview` renders inside `DragOverlay`.
+- `updateBoard(updater, { debounce })` in `KanbanBoard` is the single mutation path: it runs the updater, syncs to the backend, and optionally debounces (400 ms) for high-frequency changes like column renames.
+- Styling uses Tailwind with CSS variables (`--navy-dark`, `--primary-blue`, `--secondary-purple`, `--stroke`, `--surface`, `--shadow`, `--gray-text`) defined in the global stylesheet — use these instead of hard-coding hex values.
 
 ### Static serving
 
