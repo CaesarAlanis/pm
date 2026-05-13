@@ -166,3 +166,29 @@ export const createId = (prefix: string) => {
   const timePart = Date.now().toString(36);
   return `${prefix}-${randomPart}${timePart}`;
 };
+
+type ApiColumn = {
+  id: string;
+  title: string;
+  position: number;
+  cards: { id: string; title: string; details: string; position: number }[];
+};
+
+type ApiBoard = {
+  id: string;
+  title: string;
+  columns: ApiColumn[];
+};
+
+export const apiToBoardData = (api: ApiBoard): BoardData => {
+  const cards: Record<string, Card> = {};
+  const columns: Column[] = api.columns.map((col) => ({
+    id: col.id,
+    title: col.title,
+    cardIds: col.cards.map((card) => {
+      cards[card.id] = { id: card.id, title: card.title, details: card.details };
+      return card.id;
+    }),
+  }));
+  return { columns, cards };
+};

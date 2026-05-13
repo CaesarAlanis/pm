@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -13,11 +13,20 @@ import {
 } from "@dnd-kit/core";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
-import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
+import { ChatSidebar } from "@/components/ChatSidebar";
+import { createId, initialData, moveCard, apiToBoardData, type BoardData } from "@/lib/kanban";
+import { useAuth } from "@/lib/auth";
+
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...options, credentials: "include" });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
 
 export const KanbanBoard = () => {
   const [board, setBoard] = useState<BoardData>(() => initialData);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -26,12 +35,28 @@ export const KanbanBoard = () => {
   );
 
   const cardsById = useMemo(() => board.cards, [board.cards]);
+  const { logout } = useAuth();
+
+  const fetchBoard = useCallback(async () => {
+    try {
+      const data = await apiFetch<Parameters<typeof apiToBoardData>[0]>("/api/boards");
+      setBoard(apiToBoardData(data));
+    } catch {
+      // Fall back to initial data if API fails
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBoard();
+  }, [fetchBoard]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveCardId(event.active.id as string);
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveCardId(null);
 
@@ -39,28 +64,61 @@ export const KanbanBoard = () => {
       return;
     }
 
+    const cardId = active.id as string;
+    const overId = over.id as string;
+
+    // Optimistic update
+    const prevBoard = board;
     setBoard((prev) => ({
       ...prev,
-      columns: moveCard(prev.columns, active.id as string, over.id as string),
+      columns: moveCard(prev.columns, cardId, overId),
     }));
+
+    // Find target column and position from the new state
+    const newColumns = moveCard(prevBoard.columns, cardId, overId);
+    const targetCol = newColumns.find((col) => col.cardIds.includes(cardId));
+    if (!targetCol) return;
+    const targetPosition = targetCol.cardIds.indexOf(cardId);
+
+    try {
+      await apiFetch(`/api/boards/cards/${cardId}/move`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ column_id: targetCol.id, position: targetPosition }),
+      });
+    } catch {
+      setBoard(prevBoard);
+    }
   };
 
-  const handleRenameColumn = (columnId: string, title: string) => {
+  const handleRenameColumn = async (columnId: string, title: string) => {
+    const prevColumns = board.columns;
     setBoard((prev) => ({
       ...prev,
       columns: prev.columns.map((column) =>
         column.id === columnId ? { ...column, title } : column
       ),
     }));
+
+    try {
+      await apiFetch(`/api/boards/columns/${columnId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+    } catch {
+      setBoard((prev) => ({ ...prev, columns: prevColumns }));
+    }
   };
 
-  const handleAddCard = (columnId: string, title: string, details: string) => {
+  const handleAddCard = async (columnId: string, title: string, details: string) => {
     const id = createId("card");
+    const cardDetails = details || "No details yet.";
     setBoard((prev) => ({
       ...prev,
       cards: {
         ...prev.cards,
-        [id]: { id, title, details: details || "No details yet." },
+        [id]: { id, title, details: cardDetails },
       },
       columns: prev.columns.map((column) =>
         column.id === columnId
@@ -68,26 +126,47 @@ export const KanbanBoard = () => {
           : column
       ),
     }));
+
+    try {
+      await apiFetch("/api/boards/cards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ column_id: columnId, id, title, details: cardDetails }),
+      });
+    } catch {
+      // Revert by refetching
+      fetchBoard();
+    }
   };
 
-  const handleDeleteCard = (columnId: string, cardId: string) => {
-    setBoard((prev) => {
-      return {
-        ...prev,
-        cards: Object.fromEntries(
-          Object.entries(prev.cards).filter(([id]) => id !== cardId)
-        ),
-        columns: prev.columns.map((column) =>
-          column.id === columnId
-            ? {
-                ...column,
-                cardIds: column.cardIds.filter((id) => id !== cardId),
-              }
-            : column
-        ),
-      };
-    });
+  const handleDeleteCard = async (columnId: string, cardId: string) => {
+    const prevBoard = board;
+    setBoard((prev) => ({
+      ...prev,
+      cards: Object.fromEntries(
+        Object.entries(prev.cards).filter(([id]) => id !== cardId)
+      ),
+      columns: prev.columns.map((column) =>
+        column.id === columnId
+          ? { ...column, cardIds: column.cardIds.filter((id) => id !== cardId) }
+          : column
+      ),
+    }));
+
+    try {
+      await apiFetch(`/api/boards/cards/${cardId}`, { method: "DELETE" });
+    } catch {
+      setBoard(prevBoard);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-[var(--gray-text)]">Loading board...</p>
+      </div>
+    );
+  }
 
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
 
@@ -103,7 +182,7 @@ export const KanbanBoard = () => {
               <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)]">
                 Single Board Kanban
               </p>
-              <h1 className="mt-3 font-display text-4xl font-semibold text-[var(--navy-dark)]">
+              <h1 className="mt-3 font-display text-4xl font-semibold text-[var(--dark-teal)]">
                 Kanban Studio
               </h1>
               <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--gray-text)]">
@@ -115,18 +194,24 @@ export const KanbanBoard = () => {
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gray-text)]">
                 Focus
               </p>
-              <p className="mt-2 text-lg font-semibold text-[var(--primary-blue)]">
+              <p className="mt-2 text-lg font-semibold text-[var(--accent-turquoise)]">
                 One board. Five columns. Zero clutter.
               </p>
+              <button
+                onClick={logout}
+                className="mt-3 rounded-full border border-[var(--stroke)] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)] transition hover:text-[var(--dark-teal)]"
+              >
+                Sign out
+              </button>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4">
             {board.columns.map((column) => (
               <div
                 key={column.id}
-                className="flex items-center gap-2 rounded-full border border-[var(--stroke)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--navy-dark)]"
+                className="flex items-center gap-2 rounded-full border border-[var(--stroke)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--dark-teal)]"
               >
-                <span className="h-2 w-2 rounded-full bg-[var(--accent-yellow)]" />
+                <span className="h-2 w-2 rounded-full bg-[var(--accent-turquoise)]" />
                 {column.title}
               </div>
             ))}
@@ -160,6 +245,7 @@ export const KanbanBoard = () => {
           </DragOverlay>
         </DndContext>
       </main>
+      <ChatSidebar onBoardUpdate={fetchBoard} />
     </div>
   );
 };
