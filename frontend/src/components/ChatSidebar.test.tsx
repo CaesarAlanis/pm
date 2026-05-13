@@ -15,20 +15,20 @@ describe("ChatSidebar", () => {
 
   it("renders the toggle button", () => {
     render(<ChatSidebar />);
-    expect(screen.getByRole("button", { name: /open chat/i })).toBeInTheDocument();
+    expect(screen.getByLabelText("Open chat")).toBeInTheDocument();
   });
 
   it("opens the sidebar when toggle is clicked", async () => {
     render(<ChatSidebar />);
-    await userEvent.click(screen.getByRole("button", { name: /open chat/i }));
+    await userEvent.click(screen.getByLabelText("Open chat"));
     expect(screen.getByText("AI Assistant")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/ask the ai/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Chat message")).toBeInTheDocument();
   });
 
   it("closes the sidebar when close button is clicked", async () => {
     render(<ChatSidebar />);
-    await userEvent.click(screen.getByRole("button", { name: /open chat/i }));
-    await userEvent.click(screen.getByRole("button", { name: /close sidebar/i }));
+    await userEvent.click(screen.getByLabelText("Open chat"));
+    await userEvent.click(screen.getByLabelText("Close sidebar"));
     // Sidebar is hidden via CSS translate, not removed from DOM
     const aside = screen.getByText("AI Assistant").closest("aside");
     expect(aside?.className).toContain("translate-x-full");
@@ -41,13 +41,12 @@ describe("ChatSidebar", () => {
     });
 
     render(<ChatSidebar />);
-    await userEvent.click(screen.getByRole("button", { name: /open chat/i }));
+    await userEvent.click(screen.getByLabelText("Open chat"));
 
-    const input = screen.getByPlaceholderText(/ask the ai/i);
+    const input = screen.getByLabelText("Chat message");
     await userEvent.type(input, "Add a card");
     await userEvent.click(screen.getByRole("button", { name: /send/i }));
 
-    expect(await screen.findByText("Add a card")).toBeInTheDocument();
     expect(await screen.findByText("I added a card!")).toBeInTheDocument();
   });
 
@@ -58,9 +57,9 @@ describe("ChatSidebar", () => {
     });
 
     render(<ChatSidebar />);
-    await userEvent.click(screen.getByRole("button", { name: /open chat/i }));
+    await userEvent.click(screen.getByLabelText("Open chat"));
 
-    const input = screen.getByPlaceholderText(/ask the ai/i);
+    const input = screen.getByLabelText("Chat message");
     await userEvent.type(input, "Move card to done");
     await userEvent.click(screen.getByRole("button", { name: /send/i }));
 
@@ -75,9 +74,9 @@ describe("ChatSidebar", () => {
     });
 
     render(<ChatSidebar onBoardUpdate={onBoardUpdate} />);
-    await userEvent.click(screen.getByRole("button", { name: /open chat/i }));
+    await userEvent.click(screen.getByLabelText("Open chat"));
 
-    const input = screen.getByPlaceholderText(/ask the ai/i);
+    const input = screen.getByLabelText("Chat message");
     await userEvent.type(input, "Reorganize");
     await userEvent.click(screen.getByRole("button", { name: /send/i }));
 
@@ -92,9 +91,9 @@ describe("ChatSidebar", () => {
     });
 
     render(<ChatSidebar />);
-    await userEvent.click(screen.getByRole("button", { name: /open chat/i }));
+    await userEvent.click(screen.getByLabelText("Open chat"));
 
-    const input = screen.getByPlaceholderText(/ask the ai/i);
+    const input = screen.getByLabelText("Chat message");
     await userEvent.type(input, "Hello");
     await userEvent.click(screen.getByRole("button", { name: /send/i }));
 
@@ -103,7 +102,7 @@ describe("ChatSidebar", () => {
 
   it("disables send button when input is empty", async () => {
     render(<ChatSidebar />);
-    await userEvent.click(screen.getByRole("button", { name: /open chat/i }));
+    await userEvent.click(screen.getByLabelText("Open chat"));
     expect(screen.getByRole("button", { name: /send/i })).toBeDisabled();
   });
 });

@@ -1,10 +1,12 @@
 .git
 .env
-*.md
+AGENTS.md
+docs/
 frontend/node_modules
 frontend/.next
 frontend/out
 frontend/test-results
+frontend/coverage
 scripts/
 data/
 __pycache__/

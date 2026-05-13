@@ -11,6 +11,8 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const CSRF_HEADER = { "X-Requested-With": "fetch" };
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,7 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (user: string, password: string) => {
     const res = await fetch("/api/auth/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...CSRF_HEADER },
       credentials: "include",
       body: JSON.stringify({ username: user, password }),
     });
@@ -42,10 +44,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    await fetch("/api/auth/logout", {
-      method: "POST",
-      credentials: "include",
-    });
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...CSRF_HEADER },
+        credentials: "include",
+      });
+    } catch {
+      // Still clear local state even if server logout fails
+    }
     setUsername(null);
   };
 

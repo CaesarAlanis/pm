@@ -33,7 +33,7 @@ Set up the Docker infrastructure, the backend in backend/ with FastAPI, and writ
 - [x] Test: backend unit tests pass (3/3, 100% coverage)
 - [x] Test: visiting / shows the static HTML page (verified via local uvicorn)
 - [x] Test: /api/hello returns expected JSON (verified via local uvicorn)
-- [ ] Test: `docker compose up` starts successfully (Docker not running locally -- needs manual verification)
+- [x] Test: `docker compose up` starts successfully (verified — container healthy, all endpoints respond)
 
 **Tests:**
 - Backend unit test: GET /api/hello returns 200 with correct JSON

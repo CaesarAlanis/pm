@@ -27,8 +27,8 @@ describe("LoginPage", () => {
   it("renders login form", async () => {
     const { LoginPage } = await import("@/components/LoginPage");
     renderWithAuth(<LoginPage />);
-    expect(screen.getByPlaceholderText("Username")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Password")).toBeInTheDocument();
+    expect(screen.getByLabelText("Username")).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
   });
 
@@ -42,8 +42,8 @@ describe("LoginPage", () => {
     const { LoginPage } = await import("@/components/LoginPage");
     renderWithAuth(<LoginPage />);
 
-    await userEvent.type(screen.getByPlaceholderText("Username"), "user");
-    await userEvent.type(screen.getByPlaceholderText("Password"), "wrong");
+    await userEvent.type(screen.getByLabelText("Username"), "user");
+    await userEvent.type(screen.getByLabelText("Password"), "wrong");
     await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     expect(await screen.findByText(/invalid/i)).toBeInTheDocument();

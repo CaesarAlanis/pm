@@ -7,6 +7,9 @@ dependencies = [
     "uvicorn[standard]>=0.34",
     "httpx>=0.28",
     "python-dotenv>=1.0",
+    "bcrypt>=5.0.0",
+    "pyjwt>=2.12.1",
+    "slowapi>=0.1.9",
 ]
 
 [dependency-groups]

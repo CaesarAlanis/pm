@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, type FormEvent } from "react";
 
 type ChatMessage = {
+  id: string;
   role: "user" | "assistant";
   content: string;
   boardUpdated?: boolean;
@@ -11,6 +12,8 @@ type ChatMessage = {
 type ChatSidebarProps = {
   onBoardUpdate?: () => void;
 };
+
+const CSRF_HEADER = { "X-Requested-With": "fetch" };
 
 export const ChatSidebar = ({ onBoardUpdate }: ChatSidebarProps) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -29,22 +32,25 @@ export const ChatSidebar = ({ onBoardUpdate }: ChatSidebarProps) => {
     if (!text || sending) return;
 
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    const userMsgId = crypto.randomUUID();
+    setMessages((prev) => [...prev, { id: userMsgId, role: "user", content: text }]);
     setSending(true);
 
     try {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...CSRF_HEADER },
         credentials: "include",
         body: JSON.stringify({ message: text }),
       });
       if (!res.ok) throw new Error("Chat request failed");
       const data = await res.json();
 
+      const assistantMsgId = crypto.randomUUID();
       setMessages((prev) => [
         ...prev,
         {
+          id: assistantMsgId,
           role: "assistant",
           content: data.message,
           boardUpdated: data.board_updated,
@@ -55,9 +61,10 @@ export const ChatSidebar = ({ onBoardUpdate }: ChatSidebarProps) => {
         onBoardUpdate();
       }
     } catch {
+      const errMsgId = crypto.randomUUID();
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, something went wrong. Please try again." },
+        { id: errMsgId, role: "assistant", content: "Sorry, something went wrong. Please try again." },
       ]);
     } finally {
       setSending(false);
@@ -110,10 +117,10 @@ export const ChatSidebar = ({ onBoardUpdate }: ChatSidebarProps) => {
               Ask me to add cards, move tasks, or reorganize your board.
             </p>
           )}
-          {messages.map((msg, i) => (
+          {messages.map((msg) => (
             <div
-              key={i}
-              className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+              key={msg.id}
+              className={`break-words overflow-hidden rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 msg.role === "user"
                   ? "ml-8 bg-[#00CCA2]/10 text-[var(--dark-teal)]"
                   : "mr-8 bg-[var(--surface)] text-[var(--dark-teal)]"
@@ -145,6 +152,7 @@ export const ChatSidebar = ({ onBoardUpdate }: ChatSidebarProps) => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask the AI..."
+              aria-label="Chat message"
               className="flex-1 rounded-xl border border-[var(--stroke)] bg-white px-4 py-2.5 text-sm text-[var(--dark-teal)] outline-none transition focus:border-[#00CCA2]"
               disabled={sending}
             />

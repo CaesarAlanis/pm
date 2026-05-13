@@ -162,9 +162,7 @@ export const moveCard = (
 };
 
 export const createId = (prefix: string) => {
-  const randomPart = Math.random().toString(36).slice(2, 8);
-  const timePart = Date.now().toString(36);
-  return `${prefix}-${randomPart}${timePart}`;
+  return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
 };
 
 type ApiColumn = {
@@ -182,13 +180,17 @@ type ApiBoard = {
 
 export const apiToBoardData = (api: ApiBoard): BoardData => {
   const cards: Record<string, Card> = {};
-  const columns: Column[] = api.columns.map((col) => ({
-    id: col.id,
-    title: col.title,
-    cardIds: col.cards.map((card) => {
-      cards[card.id] = { id: card.id, title: card.title, details: card.details };
-      return card.id;
-    }),
-  }));
+  const columns: Column[] = api.columns
+    .sort((a, b) => a.position - b.position)
+    .map((col) => ({
+      id: col.id,
+      title: col.title,
+      cardIds: col.cards
+        .sort((a, b) => a.position - b.position)
+        .map((card) => {
+          cards[card.id] = { id: card.id, title: card.title, details: card.details };
+          return card.id;
+        }),
+    }));
   return { columns, cards };
 };

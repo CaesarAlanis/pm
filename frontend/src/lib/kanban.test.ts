@@ -69,4 +69,22 @@ describe("apiToBoardData", () => {
     expect(result.columns[0].cardIds).toEqual(["card-1"]);
     expect(result.cards["card-1"].title).toBe("Task 1");
   });
+
+  it("sorts columns and cards by position", () => {
+    const api = {
+      id: "board-1",
+      title: "My Board",
+      columns: [
+        { id: "col-b", title: "B", position: 1, cards: [
+          { id: "card-2", title: "Second", details: "d2", position: 1 },
+          { id: "card-1", title: "First", details: "d1", position: 0 },
+        ]},
+        { id: "col-a", title: "A", position: 0, cards: [] },
+      ],
+    };
+    const result = apiToBoardData(api);
+    expect(result.columns[0].id).toBe("col-a");
+    expect(result.columns[1].id).toBe("col-b");
+    expect(result.columns[1].cardIds).toEqual(["card-1", "card-2"]);
+  });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -17,8 +17,17 @@ import { ChatSidebar } from "@/components/ChatSidebar";
 import { createId, initialData, moveCard, apiToBoardData, type BoardData } from "@/lib/kanban";
 import { useAuth } from "@/lib/auth";
 
+const CSRF_HEADER = { "X-Requested-With": "fetch" };
+
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...options, credentials: "include" });
+  const res = await fetch(url, {
+    ...options,
+    credentials: "include",
+    headers: {
+      ...CSRF_HEADER,
+      ...(options?.headers || {}),
+    },
+  });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
@@ -27,6 +36,7 @@ export const KanbanBoard = () => {
   const [board, setBoard] = useState<BoardData>(() => initialData);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -34,8 +44,11 @@ export const KanbanBoard = () => {
     })
   );
 
-  const cardsById = useMemo(() => board.cards, [board.cards]);
+  const cardsById = board.cards;
   const { logout } = useAuth();
+
+  // Debounce timer ref for column rename
+  const renameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchBoard = useCallback(async () => {
     try {
@@ -67,15 +80,14 @@ export const KanbanBoard = () => {
     const cardId = active.id as string;
     const overId = over.id as string;
 
-    // Optimistic update
-    const prevBoard = board;
-    setBoard((prev) => ({
-      ...prev,
-      columns: moveCard(prev.columns, cardId, overId),
-    }));
+    // Compute new columns and capture previous columns for rollback
+    let prevColumns = board.columns;
+    const newColumns = moveCard(prevColumns, cardId, overId);
+    setBoard((prev) => {
+      prevColumns = prev.columns;
+      return { ...prev, columns: newColumns };
+    });
 
-    // Find target column and position from the new state
-    const newColumns = moveCard(prevBoard.columns, cardId, overId);
     const targetCol = newColumns.find((col) => col.cardIds.includes(cardId));
     if (!targetCol) return;
     const targetPosition = targetCol.cardIds.indexOf(cardId);
@@ -87,45 +99,61 @@ export const KanbanBoard = () => {
         body: JSON.stringify({ column_id: targetCol.id, position: targetPosition }),
       });
     } catch {
-      setBoard(prevBoard);
-    }
-  };
-
-  const handleRenameColumn = async (columnId: string, title: string) => {
-    const prevColumns = board.columns;
-    setBoard((prev) => ({
-      ...prev,
-      columns: prev.columns.map((column) =>
-        column.id === columnId ? { ...column, title } : column
-      ),
-    }));
-
-    try {
-      await apiFetch(`/api/boards/columns/${columnId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      });
-    } catch {
       setBoard((prev) => ({ ...prev, columns: prevColumns }));
+      setError("Failed to move card. Please try again.");
     }
   };
+
+  const handleRenameColumn = useCallback((columnId: string, title: string) => {
+    // Optimistic update immediately
+    let prevColumns: typeof board.columns = [];
+    setBoard((prev) => {
+      prevColumns = prev.columns;
+      return {
+        ...prev,
+        columns: prev.columns.map((column) =>
+          column.id === columnId ? { ...column, title } : column
+        ),
+      };
+    });
+
+    // Debounce the API call
+    if (renameTimerRef.current) {
+      clearTimeout(renameTimerRef.current);
+    }
+    renameTimerRef.current = setTimeout(async () => {
+      try {
+        await apiFetch(`/api/boards/columns/${columnId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
+      } catch {
+        setBoard((prev) => ({ ...prev, columns: prevColumns }));
+        setError("Failed to rename column. Please try again.");
+      }
+    }, 400);
+  }, []);
 
   const handleAddCard = async (columnId: string, title: string, details: string) => {
     const id = createId("card");
     const cardDetails = details || "No details yet.";
-    setBoard((prev) => ({
-      ...prev,
-      cards: {
-        ...prev.cards,
-        [id]: { id, title, details: cardDetails },
-      },
-      columns: prev.columns.map((column) =>
-        column.id === columnId
-          ? { ...column, cardIds: [...column.cardIds, id] }
-          : column
-      ),
-    }));
+    let prevBoard = board;
+    setBoard((prev) => {
+      prevBoard = prev;
+      return {
+        ...prev,
+        cards: {
+          ...prev.cards,
+          [id]: { id, title, details: cardDetails },
+        },
+        columns: prev.columns.map((column) =>
+          column.id === columnId
+            ? { ...column, cardIds: [...column.cardIds, id] }
+            : column
+        ),
+      };
+    });
 
     try {
       await apiFetch("/api/boards/cards", {
@@ -134,29 +162,33 @@ export const KanbanBoard = () => {
         body: JSON.stringify({ column_id: columnId, id, title, details: cardDetails }),
       });
     } catch {
-      // Revert by refetching
-      fetchBoard();
+      setBoard(prevBoard);
+      setError("Failed to add card. Please try again.");
     }
   };
 
   const handleDeleteCard = async (columnId: string, cardId: string) => {
-    const prevBoard = board;
-    setBoard((prev) => ({
-      ...prev,
-      cards: Object.fromEntries(
-        Object.entries(prev.cards).filter(([id]) => id !== cardId)
-      ),
-      columns: prev.columns.map((column) =>
-        column.id === columnId
-          ? { ...column, cardIds: column.cardIds.filter((id) => id !== cardId) }
-          : column
-      ),
-    }));
+    let prevBoard = board;
+    setBoard((prev) => {
+      prevBoard = prev;
+      return {
+        ...prev,
+        cards: Object.fromEntries(
+          Object.entries(prev.cards).filter(([id]) => id !== cardId)
+        ),
+        columns: prev.columns.map((column) =>
+          column.id === columnId
+            ? { ...column, cardIds: column.cardIds.filter((id) => id !== cardId) }
+            : column
+        ),
+      };
+    });
 
     try {
       await apiFetch(`/api/boards/cards/${cardId}`, { method: "DELETE" });
     } catch {
       setBoard(prevBoard);
+      setError("Failed to delete card. Please try again.");
     }
   };
 
@@ -217,6 +249,13 @@ export const KanbanBoard = () => {
             ))}
           </div>
         </header>
+
+        {error && (
+          <div className="flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="font-semibold hover:text-red-900">Dismiss</button>
+          </div>
+        )}
 
         <DndContext
           sensors={sensors}

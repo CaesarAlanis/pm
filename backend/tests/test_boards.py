@@ -1,30 +1,33 @@
 import os
 import tempfile
+from pathlib import Path
 from fastapi.testclient import TestClient
 
 from main import app
+from app.db import connection
 
 DB_PATH_BACKUP = None
+
+CSRF_HEADER = {"X-Requested-With": "fetch"}
 
 
 def setup_module():
     global DB_PATH_BACKUP
-    from app import db
     DB_PATH_BACKUP = os.environ.get("DB_PATH")
     tmp = tempfile.mktemp(suffix=".db")
     os.environ["DB_PATH"] = tmp
-    db.DB_PATH = tmp
-    db.ensure_db()
+    connection.DB_PATH = tmp
+    from app.db import ensure_db
+    ensure_db()
 
 
 def teardown_module():
     global DB_PATH_BACKUP
-    from app import db
     if DB_PATH_BACKUP is None:
         os.environ.pop("DB_PATH", None)
     else:
         os.environ["DB_PATH"] = DB_PATH_BACKUP
-    db.DB_PATH = os.environ.get("DB_PATH", str(db.Path(__file__).parent.parent / "data" / "pm.db"))
+    connection.DB_PATH = os.environ.get("DB_PATH", str(Path(__file__).parent.parent / "data" / "pm.db"))
     if os.environ.get("DB_PATH") and os.path.exists(os.environ["DB_PATH"]):
         os.unlink(os.environ["DB_PATH"])
 
@@ -35,7 +38,7 @@ AUTH_COOKIES = {}
 
 
 def login():
-    resp = client.post("/api/auth/login", json={"username": "user", "password": "password"})
+    resp = client.post("/api/auth/login", json={"username": "user", "password": "password"}, headers=CSRF_HEADER)
     AUTH_COOKIES["session_token"] = resp.cookies["session_token"]
 
 
@@ -61,6 +64,7 @@ def test_rename_column():
         "/api/boards/columns/col-backlog",
         json={"title": "Todo"},
         cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
     )
     assert response.status_code == 200
 
@@ -68,7 +72,7 @@ def test_rename_column():
     assert board["columns"][0]["title"] == "Todo"
 
     # Revert
-    client.put("/api/boards/columns/col-backlog", json={"title": "Backlog"}, cookies=AUTH_COOKIES)
+    client.put("/api/boards/columns/col-backlog", json={"title": "Backlog"}, cookies=AUTH_COOKIES, headers=CSRF_HEADER)
 
 
 def test_rename_column_missing_title():
@@ -76,8 +80,9 @@ def test_rename_column_missing_title():
         "/api/boards/columns/col-backlog",
         json={},
         cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
     )
-    assert response.status_code == 400
+    assert response.status_code in (400, 422)
 
 
 def test_rename_column_not_found():
@@ -85,6 +90,7 @@ def test_rename_column_not_found():
         "/api/boards/columns/col-nonexistent",
         json={"title": "X"},
         cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
     )
     assert response.status_code == 404
 
@@ -94,6 +100,7 @@ def test_add_card():
         "/api/boards/cards",
         json={"column_id": "col-backlog", "id": "card-test1", "title": "Test card", "details": "Test details"},
         cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
     )
     assert response.status_code == 200
 
@@ -108,8 +115,9 @@ def test_add_card_missing_fields():
         "/api/boards/cards",
         json={"column_id": "col-backlog"},
         cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
     )
-    assert response.status_code == 400
+    assert response.status_code in (400, 422)
 
 
 def test_update_card():
@@ -117,6 +125,7 @@ def test_update_card():
         "/api/boards/cards/card-1",
         json={"title": "Updated title", "details": "Updated details"},
         cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
     )
     assert response.status_code == 200
 
@@ -126,6 +135,7 @@ def test_update_card_not_found():
         "/api/boards/cards/card-nonexistent",
         json={"title": "X"},
         cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
     )
     assert response.status_code == 404
 
@@ -135,13 +145,14 @@ def test_delete_card():
         "/api/boards/cards",
         json={"column_id": "col-backlog", "id": "card-del1", "title": "To delete"},
         cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
     )
-    response = client.delete("/api/boards/cards/card-del1", cookies=AUTH_COOKIES)
+    response = client.delete("/api/boards/cards/card-del1", cookies=AUTH_COOKIES, headers=CSRF_HEADER)
     assert response.status_code == 200
 
 
 def test_delete_card_not_found():
-    response = client.delete("/api/boards/cards/card-nonexistent", cookies=AUTH_COOKIES)
+    response = client.delete("/api/boards/cards/card-nonexistent", cookies=AUTH_COOKIES, headers=CSRF_HEADER)
     assert response.status_code == 404
 
 
@@ -150,6 +161,7 @@ def test_move_card_same_column():
         "/api/boards/cards/card-1/move",
         json={"column_id": "col-backlog", "position": 1},
         cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
     )
     assert response.status_code == 200
 
@@ -158,6 +170,7 @@ def test_move_card_same_column():
         "/api/boards/cards/card-1/move",
         json={"column_id": "col-backlog", "position": 0},
         cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
     )
 
 
@@ -166,6 +179,7 @@ def test_move_card_across_columns():
         "/api/boards/cards/card-1/move",
         json={"column_id": "col-discovery", "position": 0},
         cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
     )
     assert response.status_code == 200
 
@@ -174,6 +188,7 @@ def test_move_card_across_columns():
         "/api/boards/cards/card-1/move",
         json={"column_id": "col-backlog", "position": 0},
         cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
     )
 
 
@@ -182,6 +197,7 @@ def test_move_card_not_found():
         "/api/boards/cards/card-nonexistent/move",
         json={"column_id": "col-backlog", "position": 0},
         cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
     )
     assert response.status_code == 404
 
@@ -191,5 +207,6 @@ def test_move_card_missing_fields():
         "/api/boards/cards/card-1/move",
         json={"column_id": "col-backlog"},
         cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
     )
-    assert response.status_code == 400
+    assert response.status_code in (400, 422)

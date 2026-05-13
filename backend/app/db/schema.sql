@@ -27,3 +27,7 @@ CREATE TABLE IF NOT EXISTS cards (
     position INTEGER NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_boards_user_id ON boards(user_id);
+CREATE INDEX IF NOT EXISTS idx_columns_board_id ON columns(board_id);
+CREATE INDEX IF NOT EXISTS idx_cards_column_id ON cards(column_id);
