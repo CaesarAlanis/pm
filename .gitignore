@@ -60,6 +60,15 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# SQLite database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Upload directory
+data/uploads/
+
 # Flask stuff:
 instance/
 .webassets-cache
@@ -173,4 +182,13 @@ cython_debug/
 .pypirc
 
 .DS_Store
+
+# Frontend / Node
+frontend/node_modules/
+frontend/.next/
+backend/.next/
+frontend/out/
+frontend/test-results/
+frontend/playwright-report/
+frontend/coverage/
 
