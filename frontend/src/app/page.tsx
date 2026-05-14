@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { LoginPage } from "@/components/LoginPage";
+import { RegisterPage } from "@/components/RegisterPage";
 
 const AppContent = () => {
   const { username, loading } = useAuth();
+  const [showRegister, setShowRegister] = useState(false);
 
   if (loading) {
     return (
@@ -16,7 +19,10 @@ const AppContent = () => {
   }
 
   if (!username) {
-    return <LoginPage />;
+    if (showRegister) {
+      return <RegisterPage onSwitchToLogin={() => setShowRegister(false)} />;
+    }
+    return <LoginPage onSwitchToRegister={() => setShowRegister(true)} />;
   }
 
   return <KanbanBoard />;

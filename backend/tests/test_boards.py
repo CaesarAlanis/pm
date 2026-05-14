@@ -28,7 +28,7 @@ def teardown_module():
     else:
         os.environ["DB_PATH"] = DB_PATH_BACKUP
     connection.DB_PATH = os.environ.get("DB_PATH", str(Path(__file__).parent.parent / "data" / "pm.db"))
-    if os.environ.get("DB_PATH") and os.path.exists(os.environ["DB_PATH"]):
+    if os.environ.get("DB_PATH") and os.path.exists(os.environ.get("DB_PATH", "")):
         os.unlink(os.environ["DB_PATH"])
 
 
@@ -45,18 +45,114 @@ def login():
 login()
 
 
-def test_get_board():
+def get_first_board_id() -> str:
+    boards = client.get("/api/boards", cookies=AUTH_COOKIES).json()["boards"]
+    return boards[0]["id"]
+
+
+def get_first_board() -> dict:
+    board_id = get_first_board_id()
+    return client.get(f"/api/boards/{board_id}", cookies=AUTH_COOKIES).json()
+
+
+def test_list_boards():
     response = client.get("/api/boards", cookies=AUTH_COOKIES)
     assert response.status_code == 200
     data = response.json()
-    assert data["title"] == "My Board"
-    assert len(data["columns"]) == 5
-    assert data["columns"][0]["title"] == "Backlog"
+    assert "boards" in data
+    assert len(data["boards"]) >= 1
+    assert data["boards"][0]["title"] == "My Board"
+
+
+def test_get_board():
+    board = get_first_board()
+    assert board["title"] == "My Board"
+    assert len(board["columns"]) == 5
+    assert board["columns"][0]["title"] == "Backlog"
 
 
 def test_get_board_unauthenticated():
     fresh = TestClient(app)
     assert fresh.get("/api/boards").status_code == 401
+
+
+def test_create_board():
+    response = client.post(
+        "/api/boards",
+        json={"title": "Second Board"},
+        cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] == "Second Board"
+    assert "id" in data
+
+    boards = client.get("/api/boards", cookies=AUTH_COOKIES).json()["boards"]
+    assert len(boards) >= 2
+
+
+def test_rename_board():
+    board_id = get_first_board_id()
+    response = client.put(
+        f"/api/boards/{board_id}",
+        json={"title": "Renamed Board"},
+        cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
+    )
+    assert response.status_code == 200
+
+    board = client.get(f"/api/boards/{board_id}", cookies=AUTH_COOKIES).json()
+    assert board["title"] == "Renamed Board"
+
+    # Revert
+    client.put(f"/api/boards/{board_id}", json={"title": "My Board"}, cookies=AUTH_COOKIES, headers=CSRF_HEADER)
+
+
+def test_delete_board():
+    # Create a board to delete
+    resp = client.post("/api/boards", json={"title": "To Delete"}, cookies=AUTH_COOKIES, headers=CSRF_HEADER)
+    board_id = resp.json()["id"]
+
+    response = client.delete(f"/api/boards/{board_id}", cookies=AUTH_COOKIES, headers=CSRF_HEADER)
+    assert response.status_code == 200
+
+    response = client.get(f"/api/boards/{board_id}", cookies=AUTH_COOKIES)
+    assert response.status_code == 404
+
+
+def test_add_column():
+    board_id = get_first_board_id()
+    response = client.post(
+        "/api/boards/columns",
+        json={"board_id": board_id, "title": "New Column"},
+        cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] == "New Column"
+    assert "id" in data
+
+
+def test_delete_column():
+    board_id = get_first_board_id()
+    # Create a column to delete
+    resp = client.post(
+        "/api/boards/columns",
+        json={"board_id": board_id, "title": "Delete Me"},
+        cookies=AUTH_COOKIES,
+        headers=CSRF_HEADER,
+    )
+    col_id = resp.json()["id"]
+
+    response = client.delete(f"/api/boards/columns/{col_id}", cookies=AUTH_COOKIES, headers=CSRF_HEADER)
+    assert response.status_code == 200
+
+
+def test_delete_column_not_found():
+    response = client.delete("/api/boards/columns/col-nonexistent", cookies=AUTH_COOKIES, headers=CSRF_HEADER)
+    assert response.status_code == 404
 
 
 def test_rename_column():
@@ -68,7 +164,7 @@ def test_rename_column():
     )
     assert response.status_code == 200
 
-    board = client.get("/api/boards", cookies=AUTH_COOKIES).json()
+    board = get_first_board()
     assert board["columns"][0]["title"] == "Todo"
 
     # Revert
@@ -104,7 +200,7 @@ def test_add_card():
     )
     assert response.status_code == 200
 
-    board = client.get("/api/boards", cookies=AUTH_COOKIES).json()
+    board = get_first_board()
     backlog = board["columns"][0]
     card_titles = [c["title"] for c in backlog["cards"]]
     assert "Test card" in card_titles

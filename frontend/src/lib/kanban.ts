@@ -2,6 +2,57 @@ export type Card = {
   id: string;
   title: string;
   details: string;
+  priority: "none" | "low" | "medium" | "high";
+  due_date: string | null;
+  labels: string[];
+  assignees?: Assignee[];
+};
+
+export type Comment = {
+  id: string;
+  card_id: string;
+  username: string;
+  content: string;
+  created_at?: string;
+  updated_at?: string | null;
+};
+
+export type Assignee = {
+  username: string;
+  assigned_at?: string;
+};
+
+export type Checklist = {
+  id: string;
+  card_id: string;
+  title: string;
+  position: number;
+  items: ChecklistItem[];
+};
+
+export type ChecklistItem = {
+  id: string;
+  checklist_id: string;
+  content: string;
+  checked: number;
+  position: number;
+};
+
+export type Notification = {
+  id: string;
+  board_id: string;
+  board_title: string;
+  action: string;
+  details: string;
+  read: number;
+  created_at: string;
+};
+
+export type BoardTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  columns: string[];
 };
 
 export type Column = {
@@ -10,12 +61,22 @@ export type Column = {
   cardIds: string[];
 };
 
+export type BoardSummary = {
+  id: string;
+  title: string;
+  created_at: string;
+};
+
 export type BoardData = {
+  id: string;
+  title: string;
   columns: Column[];
   cards: Record<string, Card>;
 };
 
 export const initialData: BoardData = {
+  id: "",
+  title: "",
   columns: [
     { id: "col-backlog", title: "Backlog", cardIds: ["card-1", "card-2"] },
     { id: "col-discovery", title: "Discovery", cardIds: ["card-3"] },
@@ -32,41 +93,65 @@ export const initialData: BoardData = {
       id: "card-1",
       title: "Align roadmap themes",
       details: "Draft quarterly themes with impact statements and metrics.",
+      priority: "high",
+      due_date: null,
+      labels: ["strategy", "roadmap"],
     },
     "card-2": {
       id: "card-2",
       title: "Gather customer signals",
       details: "Review support tags, sales notes, and churn feedback.",
+      priority: "medium",
+      due_date: null,
+      labels: ["research"],
     },
     "card-3": {
       id: "card-3",
       title: "Prototype analytics view",
       details: "Sketch initial dashboard layout and key drill-downs.",
+      priority: "medium",
+      due_date: null,
+      labels: ["design", "analytics"],
     },
     "card-4": {
       id: "card-4",
       title: "Refine status language",
       details: "Standardize column labels and tone across the board.",
+      priority: "low",
+      due_date: null,
+      labels: ["ux"],
     },
     "card-5": {
       id: "card-5",
       title: "Design card layout",
       details: "Add hierarchy and spacing for scanning dense lists.",
+      priority: "high",
+      due_date: null,
+      labels: ["design"],
     },
     "card-6": {
       id: "card-6",
       title: "QA micro-interactions",
       details: "Verify hover, focus, and loading states.",
+      priority: "medium",
+      due_date: null,
+      labels: ["qa"],
     },
     "card-7": {
       id: "card-7",
       title: "Ship marketing page",
       details: "Final copy approved and asset pack delivered.",
+      priority: "none",
+      due_date: null,
+      labels: ["marketing"],
     },
     "card-8": {
       id: "card-8",
       title: "Close onboarding sprint",
       details: "Document release notes and share internally.",
+      priority: "none",
+      due_date: null,
+      labels: [],
     },
   },
 };
@@ -162,14 +247,14 @@ export const moveCard = (
 };
 
 export const createId = (prefix: string) => {
-  return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
+  return `${prefix}-${crypto.randomUUID()}`;
 };
 
 type ApiColumn = {
   id: string;
   title: string;
   position: number;
-  cards: { id: string; title: string; details: string; position: number }[];
+  cards: { id: string; title: string; details: string; position: number; priority: string; due_date: string | null; labels: string }[];
 };
 
 type ApiBoard = {
@@ -188,9 +273,16 @@ export const apiToBoardData = (api: ApiBoard): BoardData => {
       cardIds: col.cards
         .sort((a, b) => a.position - b.position)
         .map((card) => {
-          cards[card.id] = { id: card.id, title: card.title, details: card.details };
+          cards[card.id] = {
+            id: card.id,
+            title: card.title,
+            details: card.details,
+            priority: (card.priority as Card["priority"]) || "none",
+            due_date: card.due_date || null,
+            labels: card.labels ? card.labels.split(",").filter(Boolean) : [],
+          };
           return card.id;
         }),
     }));
-  return { columns, cards };
+  return { id: api.id, title: api.title, columns, cards };
 };

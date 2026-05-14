@@ -6,7 +6,7 @@ from fastapi import APIRouter, Cookie, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
 from app.routes.deps import require_user, limiter, logger
-from app.db import get_board, apply_board_update
+from app.db import get_board_by_id, apply_board_update
 from app.ai import call_ai, chat_with_board
 
 router = APIRouter()
@@ -14,6 +14,7 @@ router = APIRouter()
 
 class ChatBody(BaseModel):
     message: str
+    board_id: str | None = None
 
     @field_validator("message")
     @classmethod
@@ -59,7 +60,11 @@ async def test_ai(request: Request, session_token: str | None = Cookie(None)):
 @limiter.limit("20/minute")
 async def chat(request: Request, body: ChatBody, session_token: str | None = Cookie(None)):
     username = require_user(session_token)
-    board = get_board(username)
+    if body.board_id:
+        board = get_board_by_id(body.board_id, username)
+    else:
+        from app.db import get_board
+        board = get_board(username)
     if not board:
         raise HTTPException(status_code=404, detail="Board not found")
 

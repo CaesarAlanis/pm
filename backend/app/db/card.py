@@ -1,17 +1,35 @@
-from app.db.connection import get_connection, user_owns_column, user_owns_card
+from app.db.connection import get_connection, user_owns_column, user_owns_card, user_can_access_card, user_can_access_board, get_board_id_for_column, get_board_id_for_card
 
 
-def add_card(column_id: str, card_id: str, title: str, details: str, username: str) -> bool:
+def user_can_edit_card(conn, card_id: str, username: str) -> bool:
+    if user_owns_card(conn, card_id, username):
+        return True
+    board_id = get_board_id_for_card(conn, card_id)
+    if board_id and user_can_access_board(conn, board_id, username, min_role="editor"):
+        return True
+    return False
+
+
+def user_can_edit_column(conn, column_id: str, username: str) -> bool:
+    if user_owns_column(conn, column_id, username):
+        return True
+    board_id = get_board_id_for_column(conn, column_id)
+    if board_id and user_can_access_board(conn, board_id, username, min_role="editor"):
+        return True
+    return False
+
+
+def add_card(column_id: str, card_id: str, title: str, details: str, username: str, priority: str = "none", due_date: str | None = None, labels: str = "", story_points: int | None = None, estimated_hours: float | None = None) -> bool:
     conn = get_connection()
     try:
-        if not user_owns_column(conn, column_id, username):
+        if not user_can_edit_column(conn, column_id, username):
             return False
         max_pos = conn.execute(
             "SELECT COALESCE(MAX(position), -1) FROM cards WHERE column_id = ?", (column_id,)
         ).fetchone()[0]
         conn.execute(
-            "INSERT INTO cards (id, column_id, title, details, position) VALUES (?, ?, ?, ?, ?)",
-            (card_id, column_id, title, details, max_pos + 1),
+            "INSERT INTO cards (id, column_id, title, details, position, priority, due_date, labels, story_points, estimated_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (card_id, column_id, title, details, max_pos + 1, priority, due_date, labels, story_points, estimated_hours),
         )
         conn.commit()
         return True
@@ -19,19 +37,39 @@ def add_card(column_id: str, card_id: str, title: str, details: str, username: s
         conn.close()
 
 
-def update_card(card_id: str, title: str | None, details: str | None, username: str) -> bool:
+def update_card(card_id: str, title: str | None, details: str | None, username: str, priority: str | None = None, due_date: str | None = None, labels: str | None = None, story_points: int | None = ..., estimated_hours: float | None = ...) -> bool:
     conn = get_connection()
     try:
-        if not user_owns_card(conn, card_id, username):
+        if not user_can_edit_card(conn, card_id, username):
             return False
-        if title is not None and details is not None:
-            cur = conn.execute("UPDATE cards SET title = ?, details = ? WHERE id = ?", (title, details, card_id))
-        elif title is not None:
-            cur = conn.execute("UPDATE cards SET title = ? WHERE id = ?", (title, card_id))
-        elif details is not None:
-            cur = conn.execute("UPDATE cards SET details = ? WHERE id = ?", (details, card_id))
-        else:
+        sets = []
+        params = []
+        if title is not None:
+            sets.append("title = ?")
+            params.append(title)
+        if details is not None:
+            sets.append("details = ?")
+            params.append(details)
+        if priority is not None:
+            sets.append("priority = ?")
+            params.append(priority)
+        if due_date is not None:
+            sets.append("due_date = ?")
+            params.append(due_date)
+        if labels is not None:
+            sets.append("labels = ?")
+            params.append(labels)
+        # Use ... as sentinel to distinguish "not provided" from None
+        if story_points is not ...:
+            sets.append("story_points = ?")
+            params.append(story_points)
+        if estimated_hours is not ...:
+            sets.append("estimated_hours = ?")
+            params.append(estimated_hours)
+        if not sets:
             return False
+        params.append(card_id)
+        cur = conn.execute(f"UPDATE cards SET {', '.join(sets)} WHERE id = ?", params)
         conn.commit()
         return cur.rowcount > 0
     finally:
@@ -41,7 +79,7 @@ def update_card(card_id: str, title: str | None, details: str | None, username: 
 def delete_card(card_id: str, username: str) -> bool:
     conn = get_connection()
     try:
-        if not user_owns_card(conn, card_id, username):
+        if not user_can_edit_card(conn, card_id, username):
             return False
         cur = conn.execute("DELETE FROM cards WHERE id = ?", (card_id,))
         conn.commit()
@@ -53,9 +91,9 @@ def delete_card(card_id: str, username: str) -> bool:
 def move_card(card_id: str, target_column_id: str, target_position: int, username: str) -> bool:
     conn = get_connection()
     try:
-        if not user_owns_card(conn, card_id, username):
+        if not user_can_edit_card(conn, card_id, username):
             return False
-        if not user_owns_column(conn, target_column_id, username):
+        if not user_can_edit_column(conn, target_column_id, username):
             return False
 
         conn.execute("BEGIN IMMEDIATE")
@@ -70,6 +108,12 @@ def move_card(card_id: str, target_column_id: str, target_position: int, usernam
         if src_col == target_column_id and src_pos == target_position:
             conn.rollback()
             return True
+
+        # Move card to sentinel position first to avoid position collisions
+        conn.execute(
+            "UPDATE cards SET column_id = ?, position = -1 WHERE id = ?",
+            (src_col, card_id),
+        )
 
         # Close gap in source column
         conn.execute(

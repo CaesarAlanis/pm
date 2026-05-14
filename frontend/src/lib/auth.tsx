@@ -6,6 +6,7 @@ type AuthContextType = {
   username: string | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
+  register: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -43,6 +44,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUsername(data.username);
   };
 
+  const register = async (user: string, password: string) => {
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...CSRF_HEADER },
+      credentials: "include",
+      body: JSON.stringify({ username: user, password }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new Error(data?.detail || "Registration failed");
+    }
+    const data = await res.json();
+    setUsername(data.username);
+  };
+
   const logout = async () => {
     try {
       await fetch("/api/auth/logout", {
@@ -57,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ username, loading, login, logout }}>
+    <AuthContext.Provider value={{ username, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

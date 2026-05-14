@@ -9,7 +9,8 @@ from app.session import get_user
 
 logger = logging.getLogger(__name__)
 
-limiter = Limiter(key_func=get_remote_address)
+_test_mode = os.environ.get("TESTING", "").lower() == "true"
+limiter = Limiter(key_func=get_remote_address, enabled=not _test_mode)
 
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"
 

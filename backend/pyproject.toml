@@ -10,6 +10,7 @@ dependencies = [
     "bcrypt>=5.0.0",
     "pyjwt>=2.12.1",
     "slowapi>=0.1.9",
+    "python-multipart>=0.0.28",
 ]
 
 [dependency-groups]

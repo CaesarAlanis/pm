@@ -1,4 +1,4 @@
-import { render, screen, within, act } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { AuthProvider } from "@/lib/auth";
@@ -9,40 +9,49 @@ vi.stubGlobal("fetch", mockFetch);
 const jsonOk = (data: unknown) =>
   Promise.resolve({ ok: true, json: () => Promise.resolve(data) });
 
-const jsonFail = () =>
-  Promise.resolve({ ok: false, json: () => Promise.resolve(null) });
-
 const apiBoard = {
   id: "board-1",
   title: "My Board",
   columns: [
     { id: "col-backlog", title: "Backlog", position: 0, cards: [
-      { id: "card-1", title: "Align roadmap themes", details: "Draft quarterly themes.", position: 0 },
-      { id: "card-2", title: "Gather customer signals", details: "Review support tags.", position: 1 },
+      { id: "card-1", title: "Align roadmap themes", details: "Draft quarterly themes.", position: 0, priority: "high", due_date: null, labels: "strategy" },
+      { id: "card-2", title: "Gather customer signals", details: "Review support tags.", position: 1, priority: "none", due_date: null, labels: "" },
     ]},
     { id: "col-discovery", title: "Discovery", position: 1, cards: [
-      { id: "card-3", title: "Prototype analytics view", details: "Sketch layouts.", position: 0 },
+      { id: "card-3", title: "Prototype analytics view", details: "Sketch layouts.", position: 0, priority: "none", due_date: null, labels: "" },
     ]},
     { id: "col-progress", title: "In Progress", position: 2, cards: [
-      { id: "card-4", title: "Refine status language", details: "Standardize labels.", position: 0 },
-      { id: "card-5", title: "Design card layout", details: "Add hierarchy.", position: 1 },
+      { id: "card-4", title: "Refine status language", details: "Standardize labels.", position: 0, priority: "none", due_date: null, labels: "" },
+      { id: "card-5", title: "Design card layout", details: "Add hierarchy.", position: 1, priority: "none", due_date: null, labels: "" },
     ]},
     { id: "col-review", title: "Review", position: 3, cards: [
-      { id: "card-6", title: "QA micro-interactions", details: "Verify hover states.", position: 0 },
+      { id: "card-6", title: "QA micro-interactions", details: "Verify hover states.", position: 0, priority: "none", due_date: null, labels: "" },
     ]},
     { id: "col-done", title: "Done", position: 4, cards: [
-      { id: "card-7", title: "Ship marketing page", details: "Final copy approved.", position: 0 },
-      { id: "card-8", title: "Close onboarding sprint", details: "Document release notes.", position: 1 },
+      { id: "card-7", title: "Ship marketing page", details: "Final copy approved.", position: 0, priority: "none", due_date: null, labels: "" },
+      { id: "card-8", title: "Close onboarding sprint", details: "Document release notes.", position: 1, priority: "none", due_date: null, labels: "" },
     ]},
   ],
 };
 
+const boardsList = { boards: [{ id: "board-1", title: "My Board", created_at: "2025-01-01" }] };
+
 const renderBoard = () => {
   mockFetch.mockImplementation((url: string) => {
     if (url.includes("/auth/me")) return jsonOk({ username: "user" });
-    if (url.includes("/api/boards") && !url.includes("/cards") && !url.includes("/columns")) return jsonOk(apiBoard);
+    if (url.includes("/auth/profile")) return jsonOk({ username: "user", created_at: "2025-01-01", board_count: 1 });
     if (url.includes("/auth/logout")) return jsonOk({});
-    // Board mutations
+    if (url.includes("/notifications")) return jsonOk({ notifications: [] });
+    if (url.includes("/templates")) return jsonOk({ templates: [] });
+    if (url.includes("/comments")) return jsonOk({ comments: [] });
+    if (url.includes("/assignees")) return jsonOk({ assignees: [] });
+    if (url.includes("/checklists")) return jsonOk({ checklists: [] });
+    if (url.includes("/members")) return jsonOk({ members: [] });
+    if (url.includes("/activity")) return jsonOk({ activity: [] });
+    if (url === "/api/boards" || (url.includes("/api/boards") && !url.includes("board-1") && !url.includes("/cards") && !url.includes("/columns")))
+      return jsonOk(boardsList);
+    if (url.includes("/api/boards/board-1")) return jsonOk(apiBoard);
+    // Board/column/card mutations
     return jsonOk({ detail: "ok" });
   });
   return render(

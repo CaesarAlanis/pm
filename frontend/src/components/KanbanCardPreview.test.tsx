@@ -6,6 +6,9 @@ const sampleCard: Card = {
   id: "card-test",
   title: "Test card",
   details: "Test details",
+  priority: "none",
+  due_date: null,
+  labels: [],
 };
 
 describe("KanbanCardPreview", () => {

@@ -3,7 +3,11 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "@/lib/auth";
 
-export const LoginPage = () => {
+type LoginPageProps = {
+  onSwitchToRegister?: () => void;
+};
+
+export const LoginPage = ({ onSwitchToRegister }: LoginPageProps) => {
   const { login } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -76,6 +80,18 @@ export const LoginPage = () => {
         >
           {submitting ? "Signing in..." : "Sign in"}
         </button>
+        {onSwitchToRegister && (
+          <p className="mt-4 text-center text-sm text-[var(--gray-text)]">
+            Don&apos;t have an account?{" "}
+            <button
+              type="button"
+              onClick={onSwitchToRegister}
+              className="font-semibold text-[var(--accent-turquoise)] hover:underline"
+            >
+              Create one
+            </button>
+          </p>
+        )}
       </form>
     </div>
   );
