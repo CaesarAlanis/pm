@@ -5,7 +5,7 @@ from pydantic import BaseModel, field_validator
 
 from app.routes.deps import require_user
 from app.db import add_attachment, get_attachments_for_card, delete_attachment, add_card_link, remove_card_link as db_remove_card_link, get_card_links, log_time, get_time_logs_for_card, delete_time_log
-from app.db.card import user_can_edit_card
+from app.db.card import user_can_edit_card, search_cards
 from app.db.connection import get_connection
 
 router = APIRouter()
@@ -130,3 +130,20 @@ async def remove_time_log(card_id: str, log_id: str, session_token: str | None =
     if not delete_time_log(log_id, username):
         raise HTTPException(status_code=404, detail="Time log not found")
     return {"detail": "Time log deleted"}
+
+
+# --- Advanced Search ---
+
+@router.get("/boards/{board_id}/cards/search")
+async def search_cards_endpoint(
+    board_id: str,
+    assignee: str | None = None,
+    card_type: str | None = None,
+    priority: str | None = None,
+    due_before: str | None = None,
+    due_after: str | None = None,
+    session_token: str | None = Cookie(None),
+):
+    username = require_user(session_token)
+    cards = search_cards(board_id, username, assignee=assignee, card_type=card_type, priority=priority, due_before=due_before, due_after=due_after)
+    return {"cards": cards}

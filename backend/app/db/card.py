@@ -19,7 +19,7 @@ def user_can_edit_column(conn, column_id: str, username: str) -> bool:
     return False
 
 
-def add_card(column_id: str, card_id: str, title: str, details: str, username: str, priority: str = "none", due_date: str | None = None, labels: str = "", story_points: int | None = None, estimated_hours: float | None = None) -> bool:
+def add_card(column_id: str, card_id: str, title: str, details: str, username: str, priority: str = "none", due_date: str | None = None, labels: str = "", story_points: int | None = None, estimated_hours: float | None = None, card_type: str = "task") -> bool:
     conn = get_connection()
     try:
         if not user_can_edit_column(conn, column_id, username):
@@ -28,8 +28,8 @@ def add_card(column_id: str, card_id: str, title: str, details: str, username: s
             "SELECT COALESCE(MAX(position), -1) FROM cards WHERE column_id = ?", (column_id,)
         ).fetchone()[0]
         conn.execute(
-            "INSERT INTO cards (id, column_id, title, details, position, priority, due_date, labels, story_points, estimated_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (card_id, column_id, title, details, max_pos + 1, priority, due_date, labels, story_points, estimated_hours),
+            "INSERT INTO cards (id, column_id, title, details, position, priority, due_date, labels, story_points, estimated_hours, card_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (card_id, column_id, title, details, max_pos + 1, priority, due_date, labels, story_points, estimated_hours, card_type),
         )
         conn.commit()
         return True
@@ -37,7 +37,7 @@ def add_card(column_id: str, card_id: str, title: str, details: str, username: s
         conn.close()
 
 
-def update_card(card_id: str, title: str | None, details: str | None, username: str, priority: str | None = None, due_date: str | None = None, labels: str | None = None, story_points: int | None = ..., estimated_hours: float | None = ...) -> bool:
+def update_card(card_id: str, title: str | None, details: str | None, username: str, priority: str | None = None, due_date: str | None = None, labels: str | None = None, story_points: int | None = ..., estimated_hours: float | None = ..., card_type: str | None = None) -> bool:
     conn = get_connection()
     try:
         if not user_can_edit_card(conn, card_id, username):
@@ -66,6 +66,9 @@ def update_card(card_id: str, title: str | None, details: str | None, username: 
         if estimated_hours is not ...:
             sets.append("estimated_hours = ?")
             params.append(estimated_hours)
+        if card_type is not None:
+            sets.append("card_type = ?")
+            params.append(card_type)
         if not sets:
             return False
         params.append(card_id)
@@ -141,5 +144,49 @@ def move_card(card_id: str, target_column_id: str, target_position: int, usernam
     except Exception:
         conn.rollback()
         raise
+    finally:
+        conn.close()
+
+
+def search_cards(board_id: str, username: str, assignee: str | None = None, card_type: str | None = None, priority: str | None = None, due_before: str | None = None, due_after: str | None = None) -> list[dict]:
+    conn = get_connection()
+    try:
+        from app.db.connection import user_can_access_board
+        if not user_can_access_board(conn, board_id, username):
+            return []
+        conditions = ["c.board_id = ?"]
+        params: list = [board_id]
+        if assignee is not None:
+            conditions.append("""ca.id IN (
+                SELECT card_id FROM card_assignees ca2
+                JOIN users u ON ca2.user_id = u.id
+                WHERE u.username = ?
+            )""")
+            params.append(assignee)
+        if card_type is not None:
+            conditions.append("ca.card_type = ?")
+            params.append(card_type)
+        if priority is not None:
+            conditions.append("ca.priority = ?")
+            params.append(priority)
+        if due_before is not None:
+            conditions.append("ca.due_date <= ?")
+            params.append(due_before)
+        if due_after is not None:
+            conditions.append("ca.due_date >= ?")
+            params.append(due_after)
+        where = " AND ".join(conditions)
+        rows = conn.execute(
+            f"""SELECT ca.id, ca.column_id, ca.title, ca.details, ca.position,
+                       ca.priority, ca.due_date, ca.labels, ca.story_points,
+                       ca.estimated_hours, ca.actual_hours, ca.card_type, ca.sprint_id,
+                       c.title AS column_title
+                FROM cards ca
+                JOIN columns c ON ca.column_id = c.id
+                WHERE {where}
+                ORDER BY ca.position""",
+            params,
+        ).fetchall()
+        return [dict(r) for r in rows]
     finally:
         conn.close()

@@ -12,11 +12,12 @@ type SearchFilterProps = {
 export const SearchFilter = ({ columns, cards, onFilter }: SearchFilterProps) => {
   const [query, setQuery] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [cardTypeFilter, setCardTypeFilter] = useState<string>("all");
   const [isOpen, setIsOpen] = useState(false);
 
   const allCardIds = columns.flatMap((col) => col.cardIds);
 
-  const applyFilter = (searchQuery: string, priority: string) => {
+  const applyFilter = (searchQuery: string, priority: string, cardType: string) => {
     const q = searchQuery.toLowerCase().trim();
     const filtered = new Set<string>();
 
@@ -31,8 +32,9 @@ export const SearchFilter = ({ columns, cards, onFilter }: SearchFilterProps) =>
       );
 
       const matchesPriority = priority === "all" || card.priority === priority;
+      const matchesCardType = cardType === "all" || (card.card_type || "task") === cardType;
 
-      if (matchesQuery && matchesPriority) {
+      if (matchesQuery && matchesPriority && matchesCardType) {
         filtered.add(cardId);
       }
     }
@@ -42,21 +44,27 @@ export const SearchFilter = ({ columns, cards, onFilter }: SearchFilterProps) =>
 
   const handleQueryChange = (value: string) => {
     setQuery(value);
-    applyFilter(value, priorityFilter);
+    applyFilter(value, priorityFilter, cardTypeFilter);
   };
 
   const handlePriorityChange = (value: string) => {
     setPriorityFilter(value);
-    applyFilter(query, value);
+    applyFilter(query, value, cardTypeFilter);
+  };
+
+  const handleCardTypeChange = (value: string) => {
+    setCardTypeFilter(value);
+    applyFilter(query, priorityFilter, value);
   };
 
   const handleClear = () => {
     setQuery("");
     setPriorityFilter("all");
+    setCardTypeFilter("all");
     onFilter(new Set(allCardIds));
   };
 
-  const hasActiveFilter = query || priorityFilter !== "all";
+  const hasActiveFilter = query || priorityFilter !== "all" || cardTypeFilter !== "all";
 
   return (
     <div className="relative">
@@ -100,7 +108,7 @@ export const SearchFilter = ({ columns, cards, onFilter }: SearchFilterProps) =>
       </div>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-48 rounded-2xl border border-[var(--stroke)] bg-white p-3 shadow-lg z-30">
+        <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-[var(--stroke)] bg-white p-3 shadow-lg z-30">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">Priority</p>
           <div className="space-y-1">
             {[
@@ -121,6 +129,29 @@ export const SearchFilter = ({ columns, cards, onFilter }: SearchFilterProps) =>
                 {opt.label}
               </button>
             ))}
+          </div>
+          <div className="mt-3 border-t border-[var(--stroke)] pt-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">Card Type</p>
+            <div className="space-y-1">
+              {[
+                { value: "all", label: "All Types" },
+                { value: "task", label: "Task", color: "bg-blue-400" },
+                { value: "bug", label: "Bug", color: "bg-red-400" },
+                { value: "story", label: "Story", color: "bg-green-400" },
+                { value: "epic", label: "Epic", color: "bg-purple-400" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => handleCardTypeChange(opt.value)}
+                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition hover:bg-gray-50 ${
+                    cardTypeFilter === opt.value ? "font-semibold text-[var(--dark-teal)]" : "text-[var(--gray-text)]"
+                  }`}
+                >
+                  {opt.color && <span className={`inline-flex h-2 w-2 rounded-full ${opt.color}`} />}
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

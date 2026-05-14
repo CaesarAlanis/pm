@@ -186,6 +186,7 @@ cython_debug/
 # Frontend / Node
 frontend/node_modules/
 frontend/.next/
+backend/.next/
 frontend/out/
 frontend/test-results/
 frontend/playwright-report/

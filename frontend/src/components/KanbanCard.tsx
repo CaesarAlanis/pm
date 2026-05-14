@@ -11,6 +11,13 @@ const PRIORITY_INDICATOR: Record<string, string> = {
   high: "bg-red-400",
 };
 
+const CARD_TYPE_BADGE: Record<string, string> = {
+  task: "bg-blue-50 text-blue-600",
+  bug: "bg-red-50 text-red-600",
+  story: "bg-green-50 text-green-600",
+  epic: "bg-purple-50 text-purple-600",
+};
+
 type KanbanCardProps = {
   card: Card;
   onDelete: (cardId: string) => void;
@@ -78,6 +85,11 @@ export const KanbanCard = ({ card, onDelete, onEdit }: KanbanCardProps) => {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 mb-1">
+            {card.card_type && card.card_type !== "task" && (
+              <span className={`inline-flex rounded px-1 py-px text-[9px] font-bold uppercase tracking-wider ${CARD_TYPE_BADGE[card.card_type] || ""}`}>
+                {card.card_type}
+              </span>
+            )}
             {card.priority !== "none" && (
               <span className={`inline-flex h-2 w-2 rounded-full ${PRIORITY_INDICATOR[card.priority]}`} />
             )}

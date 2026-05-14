@@ -59,6 +59,10 @@ def _run_migrations() -> None:
             conn.execute("ALTER TABLE cards ADD COLUMN estimated_hours REAL")
         if "actual_hours" not in card_cols:
             conn.execute("ALTER TABLE cards ADD COLUMN actual_hours REAL NOT NULL DEFAULT 0")
+        if "card_type" not in card_cols:
+            conn.execute("ALTER TABLE cards ADD COLUMN card_type TEXT NOT NULL DEFAULT 'task'")
+        if "sprint_id" not in card_cols:
+            conn.execute("ALTER TABLE cards ADD COLUMN sprint_id TEXT REFERENCES sprints(id) ON DELETE SET NULL")
         # Migration: add description to boards
         board_cols = [r["name"] for r in conn.execute("PRAGMA table_info(boards)").fetchall()]
         if "description" not in board_cols:
@@ -69,6 +73,10 @@ def _run_migrations() -> None:
             conn.execute("ALTER TABLE boards ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0")
         if "updated_at" not in board_cols:
             conn.execute("ALTER TABLE boards ADD COLUMN updated_at TEXT")
+        if "wip_limit" not in board_cols:
+            conn.execute("ALTER TABLE boards ADD COLUMN wip_limit INTEGER")
+        if "default_card_type" not in board_cols:
+            conn.execute("ALTER TABLE boards ADD COLUMN default_card_type TEXT")
         # Ensure newer tables exist
         _ensure_table(conn, "board_members", """CREATE TABLE IF NOT EXISTS board_members (
             board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
@@ -164,6 +172,25 @@ def _run_migrations() -> None:
             logged_at TEXT NOT NULL DEFAULT (datetime('now')),
             note TEXT NOT NULL DEFAULT ''
         )""")
+        _ensure_table(conn, "sprints", """CREATE TABLE IF NOT EXISTS sprints (
+            id TEXT PRIMARY KEY,
+            board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            goal TEXT NOT NULL DEFAULT '',
+            start_date TEXT,
+            end_date TEXT,
+            status TEXT NOT NULL DEFAULT 'planning' CHECK (status IN ('planning', 'active', 'completed')),
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )""")
+        _ensure_table(conn, "milestones", """CREATE TABLE IF NOT EXISTS milestones (
+            id TEXT PRIMARY KEY,
+            board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            due_date TEXT,
+            status TEXT NOT NULL DEFAULT 'upcoming' CHECK (status IN ('upcoming', 'in_progress', 'completed')),
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )""")
         # Ensure indexes exist
         for idx_sql in [
             "CREATE INDEX IF NOT EXISTS idx_boards_user_id ON boards(user_id)",
@@ -184,6 +211,8 @@ def _run_migrations() -> None:
             "CREATE INDEX IF NOT EXISTS idx_card_links_source ON card_links(source_card_id)",
             "CREATE INDEX IF NOT EXISTS idx_card_links_target ON card_links(target_card_id)",
             "CREATE INDEX IF NOT EXISTS idx_time_logs_card_id ON time_logs(card_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sprints_board_id ON sprints(board_id)",
+            "CREATE INDEX IF NOT EXISTS idx_milestones_board_id ON milestones(board_id)",
         ]:
             conn.execute(idx_sql)
         conn.commit()

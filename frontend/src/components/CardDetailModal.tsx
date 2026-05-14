@@ -1,25 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, type FormEvent } from "react";
-import type { Card, Comment, Assignee, Checklist, ChecklistItem } from "@/lib/kanban";
-
-const CSRF_HEADER = { "X-Requested-With": "fetch" };
-
-async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...options,
-    credentials: "include",
-    headers: {
-      ...CSRF_HEADER,
-      ...(options?.headers || {}),
-    },
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => null);
-    throw new Error(data?.detail || `API error: ${res.status}`);
-  }
-  return res.json();
-}
+import type { Card, Comment, Assignee, Checklist, ChecklistItem, Attachment, CardLink, TimeLog } from "@/lib/kanban";
+import { apiFetch } from "@/lib/api";
 
 type CardDetailModalProps = {
   card: Card;
@@ -43,6 +26,13 @@ const PRIORITY_LABELS: Record<string, string> = {
   high: "High",
 };
 
+const CARD_TYPE_COLORS: Record<string, string> = {
+  task: "bg-blue-50 text-blue-600",
+  bug: "bg-red-50 text-red-600",
+  story: "bg-green-50 text-green-600",
+  epic: "bg-purple-50 text-purple-600",
+};
+
 export const CardDetailModal = ({ card, onSave, onClose, boardId: _boardId, currentUsername }: CardDetailModalProps) => {
   const [title, setTitle] = useState(card.title);
   const [details, setDetails] = useState(card.details);
@@ -50,7 +40,7 @@ export const CardDetailModal = ({ card, onSave, onClose, boardId: _boardId, curr
   const [dueDate, setDueDate] = useState(card.due_date || "");
   const [labelsInput, setLabelsInput] = useState(card.labels.join(", "));
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<"details" | "comments" | "checklists">("details");
+  const [activeTab, setActiveTab] = useState<"details" | "comments" | "checklists" | "attachments" | "links" | "time">("details");
 
   // Comments state
   const [comments, setComments] = useState<Comment[]>([]);
@@ -65,6 +55,24 @@ export const CardDetailModal = ({ card, onSave, onClose, boardId: _boardId, curr
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [newChecklistTitle, setNewChecklistTitle] = useState("");
   const [newItemContents, setNewItemContents] = useState<Record<string, string>>({});
+
+  // Details extras
+  const [storyPoints, setStoryPoints] = useState(card.story_points ?? null);
+  const [estimatedHours, setEstimatedHours] = useState(card.estimated_hours ?? null);
+  const [cardType, setCardType] = useState(card.card_type || "task");
+
+  // Attachments state
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+
+  // Links state
+  const [cardLinks, setCardLinks] = useState<CardLink[]>([]);
+  const [newLinkCardTitle, setNewLinkCardTitle] = useState("");
+  const [newLinkType, setNewLinkType] = useState<"blocked_by" | "relates_to">("relates_to");
+
+  // Time tracking state
+  const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
+  const [logHours, setLogHours] = useState("");
+  const [logNote, setLogNote] = useState("");
 
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -94,6 +102,18 @@ export const CardDetailModal = ({ card, onSave, onClose, boardId: _boardId, curr
     apiFetch<{ checklists: Checklist[] }>(`/api/boards/cards/${card.id}/checklists`)
       .then((d) => setChecklists(d.checklists))
       .catch(() => {});
+
+    apiFetch<{ attachments: Attachment[] }>(`/api/boards/cards/${card.id}/attachments`)
+      .then((d) => setAttachments(d.attachments))
+      .catch(() => {});
+
+    apiFetch<{ links: CardLink[] }>(`/api/boards/cards/${card.id}/links`)
+      .then((d) => setCardLinks(d.links))
+      .catch(() => {});
+
+    apiFetch<{ logs: TimeLog[] }>(`/api/boards/cards/${card.id}/time`)
+      .then((d) => setTimeLogs(d.logs))
+      .catch(() => {});
   }, [card.id]);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -102,14 +122,21 @@ export const CardDetailModal = ({ card, onSave, onClose, boardId: _boardId, curr
     setSaving(true);
     try {
       const parsedLabels = labelsInput.split(",").map((l) => l.trim()).filter(Boolean);
-      await onSave(
-        card.id,
-        title.trim(),
-        details.trim(),
+      const body: Record<string, unknown> = {
+        title: title.trim(),
+        details: details.trim(),
         priority,
-        dueDate || null,
-        parsedLabels
-      );
+        due_date: dueDate || null,
+        labels: parsedLabels.join(","),
+        story_points: storyPoints,
+        estimated_hours: estimatedHours,
+        card_type: cardType,
+      };
+      await apiFetch(`/api/boards/cards/${card.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       onClose();
     } catch {
       setSaving(false);
@@ -274,18 +301,18 @@ export const CardDetailModal = ({ card, onSave, onClose, boardId: _boardId, curr
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b border-[var(--stroke)] px-6 pt-2">
-          {(["details", "comments", "checklists"] as const).map((tab) => (
+        <div className="flex gap-1 overflow-x-auto border-b border-[var(--stroke)] px-6 pt-2">
+          {(["details", "comments", "checklists", "attachments", "links", "time"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`rounded-t-lg px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+              className={`shrink-0 rounded-t-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide transition ${
                 activeTab === tab
                   ? "bg-[var(--accent-turquoise)]/10 text-[var(--accent-turquoise)]"
                   : "text-[var(--gray-text)] hover:text-[var(--dark-teal)]"
               }`}
             >
-              {tab === "details" ? "Details" : tab === "comments" ? `Comments (${comments.length})` : `Checklists (${checkedItems}/${totalChecklistItems})`}
+              {tab === "details" ? "Details" : tab === "comments" ? `Comments (${comments.length})` : tab === "checklists" ? `Checklists (${checkedItems}/${totalChecklistItems})` : tab === "attachments" ? `Files (${attachments.length})` : tab === "links" ? `Links (${cardLinks.length})` : `Time (${timeLogs.reduce((s, t) => s + t.hours, 0).toFixed(1)}h)`}
             </button>
           ))}
         </div>
@@ -344,6 +371,30 @@ export const CardDetailModal = ({ card, onSave, onClose, boardId: _boardId, curr
 
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">
+                    Card Type
+                  </label>
+                  <div className="flex gap-1.5">
+                    {(["task", "bug", "story", "epic"] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setCardType(t)}
+                        className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold capitalize transition ${
+                          cardType === t
+                            ? CARD_TYPE_COLORS[t] + " ring-2 ring-current ring-offset-1"
+                            : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">
                     Due Date
                   </label>
                   <input
@@ -366,6 +417,36 @@ export const CardDetailModal = ({ card, onSave, onClose, boardId: _boardId, curr
                   className="w-full rounded-xl border border-[var(--stroke)] bg-white px-4 py-2.5 text-sm text-[var(--dark-teal)] outline-none transition focus:border-[var(--accent-turquoise)]"
                 />
                 <p className="mt-1 text-xs text-[var(--gray-text)]">Comma-separated</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">
+                    Story Points
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={storyPoints ?? ""}
+                    onChange={(e) => setStoryPoints(e.target.value ? Number(e.target.value) : null)}
+                    placeholder="--"
+                    className="w-full rounded-xl border border-[var(--stroke)] bg-white px-4 py-2 text-sm text-[var(--dark-teal)] outline-none transition focus:border-[var(--accent-turquoise)]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">
+                    Estimated Hours
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={estimatedHours ?? ""}
+                    onChange={(e) => setEstimatedHours(e.target.value ? Number(e.target.value) : null)}
+                    placeholder="--"
+                    className="w-full rounded-xl border border-[var(--stroke)] bg-white px-4 py-2 text-sm text-[var(--dark-teal)] outline-none transition focus:border-[var(--accent-turquoise)]"
+                  />
+                </div>
               </div>
 
               {/* Assignees Section */}
@@ -568,6 +649,210 @@ export const CardDetailModal = ({ card, onSave, onClose, boardId: _boardId, curr
               {checklists.length === 0 && (
                 <p className="text-sm text-[var(--gray-text)] text-center py-8">No checklists yet</p>
               )}
+            </div>
+          )}
+
+          {activeTab === "attachments" && (
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">
+                  Upload File
+                </label>
+                <input
+                  type="file"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    try {
+                      const result = await apiFetch<Attachment>(`/api/boards/cards/${card.id}/attachments`, {
+                        method: "POST",
+                        body: formData,
+                      });
+                      setAttachments((prev) => [...prev, result]);
+                      e.target.value = "";
+                    } catch { /* silent */ }
+                  }}
+                  className="text-sm text-[var(--gray-text)] file:mr-3 file:rounded-xl file:border-0 file:bg-[var(--accent-turquoise)] file:px-4 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:brightness-110"
+                />
+              </div>
+              {attachments.length === 0 && (
+                <p className="text-sm text-[var(--gray-text)] text-center py-8">No attachments yet</p>
+              )}
+              <div className="space-y-2">
+                {attachments.map((att) => (
+                  <div key={att.id} className="flex items-center justify-between rounded-xl border border-[var(--stroke)] bg-[var(--surface)] p-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-[var(--dark-teal)]">{att.filename}</p>
+                      <p className="text-xs text-[var(--gray-text)]">{(att.file_size / 1024).toFixed(1)} KB &middot; {att.uploaded_by}</p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await apiFetch(`/api/boards/cards/${card.id}/attachments/${att.id}`, { method: "DELETE" });
+                          setAttachments((prev) => prev.filter((a) => a.id !== att.id));
+                        } catch { /* silent */ }
+                      }}
+                      className="shrink-0 rounded p-1 text-[var(--gray-text)] transition hover:bg-red-50 hover:text-red-500"
+                      aria-label="Delete attachment"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                        <path d="M2 2h10M5 2V1h4v1M3 2v9a1 1 0 001 1h6a1 1 0 001-1V2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "links" && (
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <input
+                  value={newLinkCardTitle}
+                  onChange={(e) => setNewLinkCardTitle(e.target.value)}
+                  placeholder="Card ID to link..."
+                  className="flex-1 rounded-xl border border-[var(--stroke)] bg-white px-4 py-2.5 text-sm outline-none transition focus:border-[var(--accent-turquoise)]"
+                />
+                <select
+                  value={newLinkType}
+                  onChange={(e) => setNewLinkType(e.target.value as "blocked_by" | "relates_to")}
+                  className="rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm outline-none"
+                >
+                  <option value="relates_to">Relates to</option>
+                  <option value="blocked_by">Blocked by</option>
+                </select>
+                <button
+                  onClick={async () => {
+                    if (!newLinkCardTitle.trim()) return;
+                    try {
+                      const result = await apiFetch<CardLink>(`/api/boards/cards/${card.id}/links`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ target_card_id: newLinkCardTitle.trim(), link_type: newLinkType }),
+                      });
+                      setCardLinks((prev) => [...prev, result]);
+                      setNewLinkCardTitle("");
+                    } catch { /* silent */ }
+                  }}
+                  className="rounded-xl bg-[var(--accent-turquoise)] px-4 py-2 text-xs font-semibold text-white transition hover:brightness-110"
+                >
+                  Link
+                </button>
+              </div>
+              {cardLinks.length === 0 && (
+                <p className="text-sm text-[var(--gray-text)] text-center py-8">No links yet</p>
+              )}
+              <div className="space-y-2">
+                {cardLinks.map((link) => (
+                  <div key={link.id} className="flex items-center justify-between rounded-xl border border-[var(--stroke)] bg-[var(--surface)] p-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${link.link_type === "blocked_by" ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"}`}>
+                        {link.link_type === "blocked_by" ? "Blocked by" : "Relates to"}
+                      </span>
+                      <span className="text-sm text-[var(--dark-teal)]">
+                        {link.target_title || link.source_title || link.target_card_id.slice(0, 12)}
+                      </span>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await apiFetch(`/api/boards/cards/${card.id}/links/${link.id}`, { method: "DELETE" });
+                          setCardLinks((prev) => prev.filter((l) => l.id !== link.id));
+                        } catch { /* silent */ }
+                      }}
+                      className="rounded p-1 text-[var(--gray-text)] transition hover:bg-red-50 hover:text-red-500"
+                      aria-label="Remove link"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                        <path d="M2 2h10M5 2V1h4v1M3 2v9a1 1 0 001 1h6a1 1 0 001-1V2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "time" && (
+            <div className="space-y-4">
+              {(estimatedHours != null || timeLogs.length > 0) && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-xl border border-[var(--stroke)] bg-[var(--surface)] p-3 text-center">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">Estimated</p>
+                    <p className="font-display text-xl font-bold text-[var(--dark-teal)]">{estimatedHours ?? "--"}h</p>
+                  </div>
+                  <div className="rounded-xl border border-[var(--stroke)] bg-[var(--surface)] p-3 text-center">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)]">Logged</p>
+                    <p className="font-display text-xl font-bold text-[var(--accent-turquoise)]">{timeLogs.reduce((s, t) => s + t.hours, 0).toFixed(1)}h</p>
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="0.1"
+                  step="0.5"
+                  value={logHours}
+                  onChange={(e) => setLogHours(e.target.value)}
+                  placeholder="Hours"
+                  className="w-24 rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm outline-none transition focus:border-[var(--accent-turquoise)]"
+                />
+                <input
+                  value={logNote}
+                  onChange={(e) => setLogNote(e.target.value)}
+                  placeholder="Note (optional)"
+                  className="flex-1 rounded-xl border border-[var(--stroke)] bg-white px-4 py-2 text-sm outline-none transition focus:border-[var(--accent-turquoise)]"
+                />
+                <button
+                  onClick={async () => {
+                    const hours = parseFloat(logHours);
+                    if (!hours || hours <= 0) return;
+                    try {
+                      const result = await apiFetch<TimeLog>(`/api/boards/cards/${card.id}/time`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ hours, note: logNote.trim() }),
+                      });
+                      setTimeLogs((prev) => [...prev, result]);
+                      setLogHours("");
+                      setLogNote("");
+                    } catch { /* silent */ }
+                  }}
+                  className="rounded-xl bg-[var(--accent-turquoise)] px-4 py-2 text-xs font-semibold text-white transition hover:brightness-110"
+                >
+                  Log
+                </button>
+              </div>
+              {timeLogs.length === 0 && (
+                <p className="text-sm text-[var(--gray-text)] text-center py-8">No time logged yet</p>
+              )}
+              <div className="space-y-2">
+                {timeLogs.map((log) => (
+                  <div key={log.id} className="flex items-center justify-between rounded-xl border border-[var(--stroke)] bg-[var(--surface)] p-3">
+                    <div>
+                      <p className="text-sm font-medium text-[var(--dark-teal)]">{log.hours}h &middot; {log.username || log.user_id.slice(0, 8)}</p>
+                      {log.note && <p className="text-xs text-[var(--gray-text)]">{log.note}</p>}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await apiFetch(`/api/boards/cards/${card.id}/time/${log.id}`, { method: "DELETE" });
+                          setTimeLogs((prev) => prev.filter((t) => t.id !== log.id));
+                        } catch { /* silent */ }
+                      }}
+                      className="rounded p-1 text-[var(--gray-text)] transition hover:bg-red-50 hover:text-red-500"
+                      aria-label="Delete time log"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                        <path d="M2 2h10M5 2V1h4v1M3 2v9a1 1 0 001 1h6a1 1 0 001-1V2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

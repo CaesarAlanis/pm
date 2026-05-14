@@ -4,6 +4,7 @@ import uuid
 
 from app.routes.deps import require_user
 from app.db import get_boards_for_user, get_board_by_id, create_board, delete_board, update_board_title, rename_column, add_column, delete_column, add_card, update_card, delete_card, move_card, archive_board, unarchive_board, toggle_board_favorite, update_board_description
+from app.db.board_settings import update_board_settings
 from app.db.template import get_template_by_id
 
 router = APIRouter()
@@ -42,6 +43,7 @@ class CreateCardBody(BaseModel):
     labels: str = ""
     story_points: int | None = None
     estimated_hours: float | None = None
+    card_type: str = "task"
 
     @field_validator("priority")
     @classmethod
@@ -59,12 +61,20 @@ class EditCardBody(BaseModel):
     labels: str | None = None
     story_points: int | None = None
     estimated_hours: float | None = None
+    card_type: str | None = None
 
     @field_validator("priority")
     @classmethod
     def priority_valid(cls, v: str | None) -> str | None:
         if v is not None and v not in ("none", "low", "medium", "high"):
             raise ValueError("Priority must be none, low, medium, or high")
+        return v
+
+    @field_validator("card_type")
+    @classmethod
+    def card_type_valid(cls, v: str | None) -> str | None:
+        if v is not None and v not in ("task", "bug", "story", "epic"):
+            raise ValueError("Card type must be task, bug, story, or epic")
         return v
 
 
@@ -106,6 +116,12 @@ class UpdateBoardBody(BaseModel):
 
 class UpdateBoardDescriptionBody(BaseModel):
     description: str
+
+
+class BoardSettingsBody(BaseModel):
+    wip_limit: int | None = None
+    default_card_type: str | None = None
+    description: str | None = None
 
 
 @router.get("/boards")
@@ -186,6 +202,14 @@ async def update_description_endpoint(board_id: str, body: UpdateBoardDescriptio
     return {"detail": "Description updated"}
 
 
+@router.put("/boards/{board_id}/settings")
+async def update_settings_endpoint(board_id: str, body: BoardSettingsBody, session_token: str | None = Cookie(None)):
+    username = require_user(session_token)
+    if not update_board_settings(board_id, username, wip_limit=body.wip_limit, default_card_type=body.default_card_type, description=body.description):
+        raise HTTPException(status_code=404, detail="Board not found")
+    return {"detail": "Settings updated"}
+
+
 @router.post("/boards/columns")
 async def create_column(body: CreateColumnBody, session_token: str | None = Cookie(None)):
     username = require_user(session_token)
@@ -215,7 +239,7 @@ async def remove_column(column_id: str, session_token: str | None = Cookie(None)
 async def create_card(body: CreateCardBody, session_token: str | None = Cookie(None)):
     username = require_user(session_token)
     card_id = body.id or f"card-{uuid.uuid4()}"
-    if not add_card(body.column_id, card_id, body.title, body.details, username, body.priority, body.due_date, body.labels, body.story_points, body.estimated_hours):
+    if not add_card(body.column_id, card_id, body.title, body.details, username, body.priority, body.due_date, body.labels, body.story_points, body.estimated_hours, body.card_type):
         raise HTTPException(status_code=400, detail="Failed to add card")
     return {"detail": "Card added", "id": card_id}
 
@@ -223,7 +247,7 @@ async def create_card(body: CreateCardBody, session_token: str | None = Cookie(N
 @router.put("/boards/cards/{card_id}")
 async def edit_card(card_id: str, body: EditCardBody, session_token: str | None = Cookie(None)):
     username = require_user(session_token)
-    if not update_card(card_id, body.title, body.details, username, body.priority, body.due_date, body.labels, body.story_points, body.estimated_hours):
+    if not update_card(card_id, body.title, body.details, username, body.priority, body.due_date, body.labels, body.story_points, body.estimated_hours, body.card_type):
         raise HTTPException(status_code=404, detail="Card not found")
     return {"detail": "Card updated"}
 

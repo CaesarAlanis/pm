@@ -19,30 +19,23 @@ import { CardDetailModal } from "@/components/CardDetailModal";
 import { CollaborationPanel } from "@/components/CollaborationPanel";
 import { NotificationBell } from "@/components/NotificationBell";
 import { UserProfile } from "@/components/UserProfile";
+import { UserManagementPanel } from "@/components/UserManagementPanel";
 import { TemplateSelector } from "@/components/TemplateSelector";
 import { SearchFilter } from "@/components/SearchFilter";
+import { BoardAnalyticsPanel } from "@/components/BoardAnalyticsPanel";
+import { BoardSettingsPanel } from "@/components/BoardSettingsPanel";
+import { SprintSelector } from "@/components/SprintSelector";
+import { MilestoneTracker } from "@/components/MilestoneTracker";
 import { createId, initialData, moveCard, apiToBoardData, type BoardData, type Card, type Column } from "@/lib/kanban";
 import { useAuth } from "@/lib/auth";
+import { apiFetch } from "@/lib/api";
 
-const CSRF_HEADER = { "X-Requested-With": "fetch" };
+type KanbanBoardProps = {
+  initialBoardId?: string | null;
+  onGoHome?: () => void;
+};
 
-async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...options,
-    credentials: "include",
-    headers: {
-      ...CSRF_HEADER,
-      ...(options?.headers || {}),
-    },
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => null);
-    throw new Error(data?.detail || `API error: ${res.status}`);
-  }
-  return res.json();
-}
-
-export const KanbanBoard = () => {
+export const KanbanBoard = ({ initialBoardId, onGoHome }: KanbanBoardProps) => {
   const [board, setBoard] = useState<BoardData>(() => ({ ...initialData, id: "" }));
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +46,11 @@ export const KanbanBoard = () => {
   const [showCollaboration, setShowCollaboration] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [showUserManagement, setShowUserManagement] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showMilestones, setShowMilestones] = useState(false);
+  const [activeSprintId, setActiveSprintId] = useState<string | null>(null);
   const [filteredCardIds, setFilteredCardIds] = useState<Set<string> | null>(null);
 
   const sensors = useSensors(
@@ -66,7 +64,7 @@ export const KanbanBoard = () => {
 
   const fetchBoards = useCallback(async () => {
     try {
-      const data = await apiFetch<{ boards: BoardSummary[] }>("/api/boards");
+      const data = await apiFetch<{ boards: BoardSummary[] }>("/api/boards?include_archived=true");
       setBoards(data.boards);
       return data.boards;
     } catch {
@@ -97,14 +95,17 @@ export const KanbanBoard = () => {
 
   useEffect(() => {
     fetchBoards().then((b) => {
-      if (b && b.length > 0 && !activeBoardId) {
+      if (initialBoardId) {
+        setActiveBoardId(initialBoardId);
+        fetchBoard(initialBoardId);
+      } else if (b && b.length > 0 && !activeBoardId) {
         setActiveBoardId(b[0].id);
         fetchBoard(b[0].id);
       } else if (!b || b.length === 0) {
         setLoading(false);
       }
     });
-  }, [fetchBoards, fetchBoard, activeBoardId]);
+  }, [fetchBoards, fetchBoard, activeBoardId, initialBoardId]);
 
   const handleSelectBoard = useCallback(async (boardId: string) => {
     setActiveBoardId(boardId);
@@ -164,6 +165,35 @@ export const KanbanBoard = () => {
       setError("Failed to delete board.");
     }
   }, [fetchBoards, fetchBoard, activeBoardId]);
+
+  const handleArchiveBoard = useCallback(async (boardId: string) => {
+    try {
+      await apiFetch(`/api/boards/${boardId}/archive`, { method: "PUT" });
+      await fetchBoards();
+      if (boardId === activeBoardId) {
+        const updatedBoards = await fetchBoards();
+        const activeBoards = updatedBoards.filter((b) => !b.archived);
+        if (activeBoards.length > 0) {
+          setActiveBoardId(activeBoards[0].id);
+          await fetchBoard(activeBoards[0].id);
+        } else {
+          setBoard({ ...initialData, id: "" });
+          setActiveBoardId(null);
+        }
+      }
+    } catch {
+      setError("Failed to archive board.");
+    }
+  }, [fetchBoards, fetchBoard, activeBoardId]);
+
+  const handleUnarchiveBoard = useCallback(async (boardId: string) => {
+    try {
+      await apiFetch(`/api/boards/${boardId}/unarchive`, { method: "PUT" });
+      await fetchBoards();
+    } catch {
+      setError("Failed to unarchive board.");
+    }
+  }, [fetchBoards]);
 
   const handleAddColumn = useCallback(async () => {
     if (!activeBoardId) return;
@@ -409,7 +439,20 @@ export const KanbanBoard = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {onGoHome && (
+                <button
+                  onClick={onGoHome}
+                  className="flex items-center gap-1.5 rounded-full border border-[var(--stroke)] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)] transition hover:border-[var(--accent-turquoise)] hover:text-[var(--accent-turquoise)]"
+                  aria-label="Go to dashboard"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M1 7l6-5 6 5M3 6.5V12h3V9h2v3h3V6.5" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                  </svg>
+                  Home
+                </button>
+              )}
               <SearchFilter columns={board.columns} cards={board.cards} onFilter={handleFilter} />
+              <SprintSelector boardId={activeBoardId || ""} currentSprintId={activeSprintId} onSelectSprint={setActiveSprintId} />
               <BoardList
                 boards={boards}
                 activeBoardId={activeBoardId}
@@ -417,6 +460,8 @@ export const KanbanBoard = () => {
                 onCreate={() => setShowTemplateSelector(true)}
                 onRename={handleRenameBoard}
                 onDelete={handleDeleteBoard}
+                onArchive={handleArchiveBoard}
+                onUnarchive={handleUnarchiveBoard}
               />
               <button
                 onClick={() => setShowCollaboration(true)}
@@ -431,6 +476,46 @@ export const KanbanBoard = () => {
                 Team
               </button>
               <NotificationBell />
+              <button
+                onClick={() => setShowUserManagement(true)}
+                className="flex items-center gap-1.5 rounded-full border border-[var(--stroke)] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)] transition hover:border-[var(--accent-turquoise)] hover:text-[var(--accent-turquoise)]"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <circle cx="7" cy="4" r="2.5" stroke="currentColor" strokeWidth="1.2"/>
+                  <path d="M2 13c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+                Users
+              </button>
+              <button
+                onClick={() => setShowAnalytics(true)}
+                className="flex items-center gap-1.5 rounded-full border border-[var(--stroke)] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)] transition hover:border-[var(--accent-turquoise)] hover:text-[var(--accent-turquoise)]"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <rect x="1" y="8" width="3" height="5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <rect x="5.5" y="4" width="3" height="9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <rect x="10" y="1" width="3" height="12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Analytics
+              </button>
+              <button
+                onClick={() => setShowSettings(true)}
+                className="flex items-center gap-1.5 rounded-full border border-[var(--stroke)] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)] transition hover:border-[var(--accent-turquoise)] hover:text-[var(--accent-turquoise)]"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <circle cx="7" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.2"/>
+                  <path d="M7 1v2M7 11v2M1 7h2M11 7h2M2.5 2.5l1.4 1.4M10.1 10.1l1.4 1.4M2.5 11.5l1.4-1.4M10.1 3.9l1.4-1.4" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                </svg>
+                Settings
+              </button>
+              <button
+                onClick={() => setShowMilestones(true)}
+                className="flex items-center gap-1.5 rounded-full border border-[var(--stroke)] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)] transition hover:border-[var(--accent-turquoise)] hover:text-[var(--accent-turquoise)]"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M3 1h8l2 4-6 8L1 5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                </svg>
+                Milestones
+              </button>
               <span className="hidden text-sm font-medium text-[var(--accent-turquoise)] sm:block">
                 {board.columns.length} columns &middot; {totalCards} cards
               </span>
@@ -533,6 +618,10 @@ export const KanbanBoard = () => {
         onClose={() => setShowCollaboration(false)}
       />
       {showProfile && <UserProfile onClose={() => setShowProfile(false)} />}
+      {showUserManagement && <UserManagementPanel onClose={() => setShowUserManagement(false)} />}
+      {showAnalytics && activeBoardId && <BoardAnalyticsPanel boardId={activeBoardId} onClose={() => setShowAnalytics(false)} />}
+      {showSettings && activeBoardId && <BoardSettingsPanel boardId={activeBoardId} onClose={() => setShowSettings(false)} onUpdated={handleRefreshBoard} />}
+      {showMilestones && activeBoardId && <MilestoneTracker boardId={activeBoardId} onClose={() => setShowMilestones(false)} />}
       {showTemplateSelector && (
         <TemplateSelector
           onSelect={(templateId, title) => {

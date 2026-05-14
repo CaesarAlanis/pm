@@ -10,6 +10,8 @@ from app.routes.notifications import router as notifications_router
 from app.routes.template import router as template_router
 from app.routes.cards import router as cards_router
 from app.routes.analytics import router as analytics_router
+from app.routes.sprint import router as sprint_router
+from app.routes.milestone import router as milestone_router
 
 router = APIRouter()
 
@@ -22,5 +24,7 @@ router.include_router(notifications_router)
 router.include_router(template_router)
 router.include_router(cards_router)
 router.include_router(analytics_router)
+router.include_router(sprint_router)
+router.include_router(milestone_router)
 
 __all__ = ["router", "limiter"]

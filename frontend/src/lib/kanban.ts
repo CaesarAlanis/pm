@@ -6,6 +6,11 @@ export type Card = {
   due_date: string | null;
   labels: string[];
   assignees?: Assignee[];
+  story_points?: number | null;
+  estimated_hours?: number | null;
+  actual_hours?: number | null;
+  card_type?: "task" | "bug" | "story" | "epic";
+  sprint_id?: string | null;
 };
 
 export type Comment = {
@@ -36,6 +41,35 @@ export type ChecklistItem = {
   content: string;
   checked: number;
   position: number;
+};
+
+export type Attachment = {
+  id: string;
+  filename: string;
+  file_size: number;
+  content_type: string;
+  uploaded_by: string;
+  created_at: string;
+};
+
+export type CardLink = {
+  id: string;
+  source_card_id: string;
+  target_card_id: string;
+  link_type: "blocked_by" | "relates_to";
+  target_title?: string;
+  source_title?: string;
+  direction?: "outgoing" | "incoming";
+  created_at: string;
+};
+
+export type TimeLog = {
+  id: string;
+  user_id: string;
+  username?: string;
+  hours: number;
+  note: string;
+  logged_at: string;
 };
 
 export type Notification = {
@@ -72,6 +106,35 @@ export type BoardData = {
   title: string;
   columns: Column[];
   cards: Record<string, Card>;
+};
+
+export type DashboardData = {
+  total_boards: number;
+  total_cards: number;
+  cards_assigned_to_me: number;
+  overdue_cards: OverdueCard[];
+  recently_active_boards: RecentlyActiveBoard[];
+};
+
+export type OverdueCard = {
+  id: string;
+  title: string;
+  due_date: string;
+  board_id: string;
+  board_title: string;
+};
+
+export type RecentlyActiveBoard = {
+  id: string;
+  title: string;
+  updated_at: string | null;
+};
+
+export type UserListItem = {
+  id: string;
+  username: string;
+  created_at: string;
+  board_count: number;
 };
 
 export const initialData: BoardData = {
@@ -254,7 +317,7 @@ type ApiColumn = {
   id: string;
   title: string;
   position: number;
-  cards: { id: string; title: string; details: string; position: number; priority: string; due_date: string | null; labels: string }[];
+  cards: { id: string; title: string; details: string; position: number; priority: string; due_date: string | null; labels: string; card_type?: string }[];
 };
 
 type ApiBoard = {
@@ -280,6 +343,7 @@ export const apiToBoardData = (api: ApiBoard): BoardData => {
             priority: (card.priority as Card["priority"]) || "none",
             due_date: card.due_date || null,
             labels: card.labels ? card.labels.split(",").filter(Boolean) : [],
+            card_type: (card.card_type as Card["card_type"]) || "task",
           };
           return card.id;
         }),

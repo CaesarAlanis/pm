@@ -1,11 +1,12 @@
 import re
 
-from fastapi import APIRouter, Cookie, HTTPException, Request, Response
+from fastapi import APIRouter, Cookie, HTTPException, Query, Request, Response
 from pydantic import BaseModel, field_validator
 
 from app.session import create_session, delete_session, verify_password, create_user, user_exists, change_password, revoke_all_user_sessions
 from app.routes.deps import require_user, limiter, COOKIE_SECURE
 from app.db.connection import get_connection
+from app.db.user import list_users, count_users
 
 router = APIRouter()
 
@@ -167,3 +168,11 @@ async def search_users(q: str = "", session_token: str | None = Cookie(None)):
         return {"users": [r["username"] for r in rows]}
     finally:
         conn.close()
+
+
+@router.get("/auth/users")
+async def get_users(limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0), session_token: str | None = Cookie(None)):
+    require_user(session_token)
+    users = list_users(limit=limit, offset=offset)
+    total = count_users()
+    return {"users": users, "total": total}

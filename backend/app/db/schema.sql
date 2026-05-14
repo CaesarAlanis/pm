@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS boards (
     user_id TEXT NOT NULL REFERENCES users(id),
     title TEXT NOT NULL DEFAULT 'My Board',
     description TEXT NOT NULL DEFAULT '',
+    wip_limit INTEGER,
+    default_card_type TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
     favorite INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -23,6 +25,19 @@ CREATE TABLE IF NOT EXISTS columns (
     position INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS sprints (
+    id TEXT PRIMARY KEY,
+    board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    goal TEXT NOT NULL DEFAULT '',
+    start_date TEXT,
+    end_date TEXT,
+    status TEXT NOT NULL DEFAULT 'planning' CHECK (status IN ('planning', 'active', 'completed')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_sprints_board_id ON sprints(board_id);
+
 CREATE TABLE IF NOT EXISTS cards (
     id TEXT PRIMARY KEY,
     column_id TEXT NOT NULL REFERENCES columns(id),
@@ -35,8 +50,22 @@ CREATE TABLE IF NOT EXISTS cards (
     story_points INTEGER,
     estimated_hours REAL,
     actual_hours REAL NOT NULL DEFAULT 0,
+    card_type TEXT NOT NULL DEFAULT 'task' CHECK (card_type IN ('task', 'bug', 'story', 'epic')),
+    sprint_id TEXT REFERENCES sprints(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS milestones (
+    id TEXT PRIMARY KEY,
+    board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    due_date TEXT,
+    status TEXT NOT NULL DEFAULT 'upcoming' CHECK (status IN ('upcoming', 'in_progress', 'completed')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_milestones_board_id ON milestones(board_id);
 
 CREATE INDEX IF NOT EXISTS idx_boards_user_id ON boards(user_id);
 CREATE INDEX IF NOT EXISTS idx_boards_archived ON boards(archived);
@@ -177,7 +206,7 @@ CREATE INDEX IF NOT EXISTS idx_time_logs_card_id ON time_logs(card_id);
 CREATE TRIGGER IF NOT EXISTS boards_updated_at
 AFTER UPDATE ON boards
 FOR EACH ROW
-WHEN OLD.title IS NOT NEW.title OR OLD.description IS NOT NEW.description OR OLD.archived IS NOT NEW.archived OR OLD.favorite IS NOT NEW.favorite
+WHEN OLD.title IS NOT NEW.title OR OLD.description IS NOT NEW.description OR OLD.archived IS NOT NEW.archived OR OLD.favorite IS NOT NEW.favorite OR OLD.wip_limit IS NOT NEW.wip_limit OR OLD.default_card_type IS NOT NEW.default_card_type
 BEGIN
     UPDATE boards SET updated_at = datetime('now') WHERE id = NEW.id;
 END;

@@ -6,6 +6,7 @@ export type BoardSummary = {
   id: string;
   title: string;
   created_at: string;
+  archived?: number;
 };
 
 type BoardListProps = {
@@ -15,6 +16,8 @@ type BoardListProps = {
   onCreate: () => void;
   onRename: (boardId: string, title: string) => void;
   onDelete: (boardId: string) => void;
+  onArchive?: (boardId: string) => void;
+  onUnarchive?: (boardId: string) => void;
 };
 
 export const BoardList = ({
@@ -24,11 +27,14 @@ export const BoardList = ({
   onCreate,
   onRename,
   onDelete,
+  onArchive,
+  onUnarchive,
 }: BoardListProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
@@ -38,6 +44,7 @@ export const BoardList = ({
         setIsOpen(false);
         setEditingId(null);
         setConfirmDeleteId(null);
+        setShowArchived(false);
       }
     };
     if (isOpen) document.addEventListener("mousedown", handleClickOutside);
@@ -167,6 +174,40 @@ export const BoardList = ({
           </div>
 
           <div className="mt-1 border-t border-[var(--stroke)] pt-1">
+            {boards.some((b) => b.archived) && (
+              <div className="mb-1">
+                <button
+                  onClick={() => setShowArchived(!showArchived)}
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)] transition hover:bg-gray-50"
+                >
+                  <span>Archived ({boards.filter((b) => b.archived).length})</span>
+                  <svg
+                    width="10" height="10" viewBox="0 0 10 10" fill="none"
+                    className={`transition-transform ${showArchived ? "rotate-180" : ""}`}
+                  >
+                    <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                {showArchived && boards.filter((b) => b.archived).map((board) => (
+                  <div key={board.id} className="flex items-center justify-between rounded-xl px-3 py-2 text-[var(--gray-text)]">
+                    <span className="truncate text-xs font-medium opacity-60">{board.title}</span>
+                    <div className="flex items-center gap-1">
+                      {onUnarchive && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onUnarchive(board.id); }}
+                          className="rounded-lg p-1 text-[var(--gray-text)] transition hover:bg-green-50 hover:text-green-500"
+                          aria-label={`Unarchive ${board.title}`}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 6h8M6 2v8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <button
               onClick={() => { onCreate(); setIsOpen(false); }}
               className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--accent-turquoise)] transition hover:bg-[var(--accent-turquoise)]/5"

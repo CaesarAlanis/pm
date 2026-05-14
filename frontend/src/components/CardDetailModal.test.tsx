@@ -18,21 +18,22 @@ const baseCard: Card = {
   labels: ["design", "frontend"],
 };
 
+const setupMocks = () => {
+  mockFetch.mockImplementation((url: string) => {
+    if (url.includes("/comments")) return jsonOk({ comments: [] });
+    if (url.includes("/assignees")) return jsonOk({ assignees: [] });
+    if (url.includes("/checklists")) return jsonOk({ checklists: [] });
+    if (url.includes("/attachments")) return jsonOk({ attachments: [] });
+    if (url.includes("/links")) return jsonOk({ links: [] });
+    if (url.includes("/time")) return jsonOk({ logs: [] });
+    return jsonOk({});
+  });
+};
+
 describe("CardDetailModal", () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    mockFetch.mockImplementation((url: string) => {
-      if (url.includes("/comments")) {
-        return jsonOk({ comments: [] });
-      }
-      if (url.includes("/assignees")) {
-        return jsonOk({ assignees: [] });
-      }
-      if (url.includes("/checklists")) {
-        return jsonOk({ checklists: [] });
-      }
-      return jsonOk({});
-    });
+    setupMocks();
   });
 
   it("renders modal with card title", () => {
@@ -48,7 +49,7 @@ describe("CardDetailModal", () => {
     expect(screen.getByDisplayValue("Design Feature")).toBeInTheDocument();
   });
 
-  it("shows tabs for Details, Comments, Checklists", async () => {
+  it("shows tabs for Details, Comments, Checklists, Attachments, Links, Time", async () => {
     render(
       <CardDetailModal
         card={baseCard}
@@ -61,6 +62,9 @@ describe("CardDetailModal", () => {
     expect(screen.getAllByText("Details").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Comments (0)")).toBeInTheDocument();
     expect(screen.getByText("Checklists (0/0)")).toBeInTheDocument();
+    expect(screen.getByText("Files (0)")).toBeInTheDocument();
+    expect(screen.getByText("Links (0)")).toBeInTheDocument();
+    expect(screen.getByText(/Time/)).toBeInTheDocument();
   });
 
   it("calls onClose when close button is clicked", async () => {
@@ -118,13 +122,13 @@ describe("CardDetailModal", () => {
     expect(dateInput).toBeInTheDocument();
   });
 
-  it("calls onSave with updated card data on save", async () => {
-    const onSave = vi.fn().mockResolvedValue(undefined);
+  it("saves card via API and calls onClose", async () => {
+    const onClose = vi.fn();
     render(
       <CardDetailModal
         card={baseCard}
-        onSave={onSave}
-        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onClose={onClose}
         boardId="board-1"
         currentUsername="testuser"
       />
@@ -133,6 +137,20 @@ describe("CardDetailModal", () => {
     await userEvent.clear(titleInput);
     await userEvent.type(titleInput, "Updated Title");
     await userEvent.click(screen.getByText("Save"));
-    expect(onSave).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("shows story points and estimated hours fields", () => {
+    render(
+      <CardDetailModal
+        card={baseCard}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+        boardId="board-1"
+        currentUsername="testuser"
+      />
+    );
+    expect(screen.getByText("Story Points")).toBeInTheDocument();
+    expect(screen.getByText("Estimated Hours")).toBeInTheDocument();
   });
 });

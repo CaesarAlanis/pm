@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, type FormEvent } from "react";
+import { apiFetch } from "@/lib/api";
 
 type ChatMessage = {
   id: string;
@@ -12,8 +13,6 @@ type ChatMessage = {
 type ChatSidebarProps = {
   onBoardUpdate?: () => void;
 };
-
-const CSRF_HEADER = { "X-Requested-With": "fetch" };
 
 export const ChatSidebar = ({ onBoardUpdate }: ChatSidebarProps) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -37,14 +36,11 @@ export const ChatSidebar = ({ onBoardUpdate }: ChatSidebarProps) => {
     setSending(true);
 
     try {
-      const res = await fetch("/api/ai/chat", {
+      const data = await apiFetch<{ message: string; board_updated: boolean }>("/api/ai/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...CSRF_HEADER },
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text }),
       });
-      if (!res.ok) throw new Error("Chat request failed");
-      const data = await res.json();
 
       const assistantMsgId = crypto.randomUUID();
       setMessages((prev) => [

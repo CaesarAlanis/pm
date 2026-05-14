@@ -49,7 +49,7 @@ def get_board_by_id(board_id: str, username: str) -> dict | None:
         if not user:
             return None
         board = conn.execute(
-            "SELECT id, title, description, archived, favorite, created_at, updated_at FROM boards WHERE id = ? AND user_id = ?",
+            "SELECT id, title, description, wip_limit, default_card_type, archived, favorite, created_at, updated_at FROM boards WHERE id = ? AND user_id = ?",
             (board_id, user["id"]),
         ).fetchone()
         if not board:
@@ -62,7 +62,7 @@ def get_board_by_id(board_id: str, username: str) -> dict | None:
             if not member:
                 return None
             board = conn.execute(
-                "SELECT id, title, description, archived, favorite, created_at, updated_at FROM boards WHERE id = ?",
+                "SELECT id, title, description, wip_limit, default_card_type, archived, favorite, created_at, updated_at FROM boards WHERE id = ?",
                 (board_id,),
             ).fetchone()
             if not board:
@@ -74,7 +74,7 @@ def get_board_by_id(board_id: str, username: str) -> dict | None:
         result_columns = []
         for col in columns:
             cards = conn.execute(
-                "SELECT id, title, details, position, priority, due_date, labels, story_points, estimated_hours, actual_hours FROM cards WHERE column_id = ? ORDER BY position",
+                "SELECT id, title, details, position, priority, due_date, labels, story_points, estimated_hours, actual_hours, card_type FROM cards WHERE column_id = ? ORDER BY position",
                 (col["id"],),
             ).fetchall()
             result_columns.append({
@@ -87,6 +87,8 @@ def get_board_by_id(board_id: str, username: str) -> dict | None:
             "id": board["id"],
             "title": board["title"],
             "description": board["description"],
+            "wip_limit": board["wip_limit"],
+            "default_card_type": board["default_card_type"],
             "archived": board["archived"],
             "favorite": board["favorite"],
             "created_at": board["created_at"],

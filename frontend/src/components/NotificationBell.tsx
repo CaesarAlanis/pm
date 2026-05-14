@@ -2,24 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { Notification } from "@/lib/kanban";
-
-const CSRF_HEADER = { "X-Requested-With": "fetch" };
-
-async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...options,
-    credentials: "include",
-    headers: {
-      ...CSRF_HEADER,
-      ...(options?.headers || {}),
-    },
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => null);
-    throw new Error(data?.detail || `API error: ${res.status}`);
-  }
-  return res.json();
-}
+import { apiFetch } from "@/lib/api";
 
 export const NotificationBell = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
