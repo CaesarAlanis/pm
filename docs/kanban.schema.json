@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/kanban.schema.json",
+  "title": "Kanban Data Model",
+  "type": "object",
+  "required": ["users", "boards", "columns", "cards"],
+  "properties": {
+    "users": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/user" }
+    },
+    "boards": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/board" }
+    },
+    "columns": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/column" }
+    },
+    "cards": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/card" }
+    }
+  },
+  "$defs": {
+    "user": {
+      "type": "object",
+      "required": ["id", "username", "created_at"],
+      "properties": {
+        "id": { "type": "string", "description": "Primary key (UUID)." },
+        "username": { "type": "string", "minLength": 1 },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "board": {
+      "type": "object",
+      "required": ["id", "user_id", "name", "created_at"],
+      "properties": {
+        "id": { "type": "string", "description": "Primary key (UUID)." },
+        "user_id": {
+          "type": "string",
+          "description": "References user.id (one board per user)."
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "column": {
+      "type": "object",
+      "required": ["id", "board_id", "title", "position", "created_at"],
+      "properties": {
+        "id": { "type": "string", "description": "Primary key (UUID)." },
+        "board_id": { "type": "string", "description": "References board.id." },
+        "title": { "type": "string", "minLength": 1 },
+        "position": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Sort order within the board."
+        },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "card": {
+      "type": "object",
+      "required": ["id", "column_id", "title", "details", "position", "created_at"],
+      "properties": {
+        "id": { "type": "string", "description": "Primary key (UUID)." },
+        "column_id": { "type": "string", "description": "References column.id." },
+        "title": { "type": "string", "minLength": 1 },
+        "details": { "type": "string" },
+        "position": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Sort order within the column."
+        },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
