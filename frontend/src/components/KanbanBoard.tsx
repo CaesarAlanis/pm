@@ -1,13 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
-  closestCorners,
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -15,9 +17,12 @@ import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
 
+const BOARD_ENDPOINT = "/api/board?username=user";
+
 export const KanbanBoard = () => {
   const [board, setBoard] = useState<BoardData>(() => initialData);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -25,7 +30,62 @@ export const KanbanBoard = () => {
     })
   );
 
+  const collisionDetection: CollisionDetection = (args) => {
+    const pointerCollisions = pointerWithin(args);
+    if (pointerCollisions.length > 0) {
+      return pointerCollisions;
+    }
+    return rectIntersection(args);
+  };
+
   const cardsById = useMemo(() => board.cards, [board.cards]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadBoard = async () => {
+      try {
+        const response = await fetch(BOARD_ENDPOINT, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          return;
+        }
+        const data = (await response.json()) as BoardData;
+        setBoard(data);
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          // ignore load errors for now and keep initial data
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadBoard();
+
+    return () => controller.abort();
+  }, []);
+
+  const syncBoard = async (nextBoard: BoardData) => {
+    try {
+      await fetch(BOARD_ENDPOINT, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nextBoard),
+      });
+    } catch {
+      // intentionally swallow errors to keep UI responsive
+    }
+  };
+
+  const persistBoard = (updater: (prev: BoardData) => BoardData) => {
+    setBoard((prev) => {
+      const nextBoard = updater(prev);
+      void syncBoard(nextBoard);
+      return nextBoard;
+    });
+  };
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveCardId(event.active.id as string);
@@ -39,14 +99,14 @@ export const KanbanBoard = () => {
       return;
     }
 
-    setBoard((prev) => ({
+    persistBoard((prev) => ({
       ...prev,
       columns: moveCard(prev.columns, active.id as string, over.id as string),
     }));
   };
 
   const handleRenameColumn = (columnId: string, title: string) => {
-    setBoard((prev) => ({
+    persistBoard((prev) => ({
       ...prev,
       columns: prev.columns.map((column) =>
         column.id === columnId ? { ...column, title } : column
@@ -56,7 +116,7 @@ export const KanbanBoard = () => {
 
   const handleAddCard = (columnId: string, title: string, details: string) => {
     const id = createId("card");
-    setBoard((prev) => ({
+    persistBoard((prev) => ({
       ...prev,
       cards: {
         ...prev.cards,
@@ -71,22 +131,20 @@ export const KanbanBoard = () => {
   };
 
   const handleDeleteCard = (columnId: string, cardId: string) => {
-    setBoard((prev) => {
-      return {
-        ...prev,
-        cards: Object.fromEntries(
-          Object.entries(prev.cards).filter(([id]) => id !== cardId)
-        ),
-        columns: prev.columns.map((column) =>
-          column.id === columnId
-            ? {
-                ...column,
-                cardIds: column.cardIds.filter((id) => id !== cardId),
-              }
-            : column
-        ),
-      };
-    });
+    persistBoard((prev) => ({
+      ...prev,
+      cards: Object.fromEntries(
+        Object.entries(prev.cards).filter(([id]) => id !== cardId)
+      ),
+      columns: prev.columns.map((column) =>
+        column.id === columnId
+          ? {
+              ...column,
+              cardIds: column.cardIds.filter((id) => id !== cardId),
+            }
+          : column
+      ),
+    }));
   };
 
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
@@ -135,7 +193,7 @@ export const KanbanBoard = () => {
 
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={collisionDetection}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
@@ -151,6 +209,11 @@ export const KanbanBoard = () => {
               />
             ))}
           </section>
+          {isLoading ? (
+            <p className="text-xs uppercase tracking-[0.25em] text-[var(--gray-text)]">
+              Syncing board...
+            </p>
+          ) : null}
           <DragOverlay>
             {activeCard ? (
               <div className="w-[260px]">

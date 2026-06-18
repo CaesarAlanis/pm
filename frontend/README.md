@@ -11,5 +11,17 @@ npm run dev
 
 ```bash
 npm run test:unit
+```
+
+For end-to-end tests, start the backend Docker container first so the app is
+available at `http://localhost:8000`:
+
+```bash
+../scripts/start-mac.sh
+```
+
+Then run:
+
+```bash
 npm run test:e2e
 ```

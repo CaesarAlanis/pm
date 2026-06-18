@@ -1,13 +1,77 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+const initialBoard = {
+  columns: [
+    { id: "col-backlog", title: "Backlog", cardIds: ["card-1", "card-2"] },
+    { id: "col-discovery", title: "Discovery", cardIds: ["card-3"] },
+    { id: "col-progress", title: "In Progress", cardIds: ["card-4", "card-5"] },
+    { id: "col-review", title: "Review", cardIds: ["card-6"] },
+    { id: "col-done", title: "Done", cardIds: ["card-7", "card-8"] },
+  ],
+  cards: {
+    "card-1": {
+      id: "card-1",
+      title: "Align roadmap themes",
+      details: "Draft quarterly themes with impact statements and metrics.",
+    },
+    "card-2": {
+      id: "card-2",
+      title: "Gather customer signals",
+      details: "Review support tags, sales notes, and churn feedback.",
+    },
+    "card-3": {
+      id: "card-3",
+      title: "Prototype analytics view",
+      details: "Sketch initial dashboard layout and key drill-downs.",
+    },
+    "card-4": {
+      id: "card-4",
+      title: "Refine status language",
+      details: "Standardize column labels and tone across the board.",
+    },
+    "card-5": {
+      id: "card-5",
+      title: "Design card layout",
+      details: "Add hierarchy and spacing for scanning dense lists.",
+    },
+    "card-6": {
+      id: "card-6",
+      title: "QA micro-interactions",
+      details: "Verify hover, focus, and loading states.",
+    },
+    "card-7": {
+      id: "card-7",
+      title: "Ship marketing page",
+      details: "Final copy approved and asset pack delivered.",
+    },
+    "card-8": {
+      id: "card-8",
+      title: "Close onboarding sprint",
+      details: "Document release notes and share internally.",
+    },
+  },
+};
+
+test.beforeEach(async ({ request }) => {
+  await request.put("/api/board?username=user", { data: initialBoard });
+});
+
+const login = async (page: Page) => {
+  await page.goto("/");
+  await page.getByLabel("Username").fill("user");
+  await page.getByLabel("Password").fill("password");
+  await page.getByRole("button", { name: /sign in/i }).click();
+  await expect(page.getByRole("heading", { name: "Kanban Studio" })).toBeVisible();
+};
 
 test("loads the kanban board", async ({ page }) => {
-  await page.goto("/");
+  await login(page);
   await expect(page.getByRole("heading", { name: "Kanban Studio" })).toBeVisible();
   await expect(page.locator('[data-testid^="column-"]')).toHaveCount(5);
 });
 
 test("adds a card to a column", async ({ page }) => {
-  await page.goto("/");
+  await login(page);
   const firstColumn = page.locator('[data-testid^="column-"]').first();
   await firstColumn.getByRole("button", { name: /add a card/i }).click();
   await firstColumn.getByPlaceholder("Card title").fill("Playwright card");
@@ -17,7 +81,7 @@ test("adds a card to a column", async ({ page }) => {
 });
 
 test("moves a card between columns", async ({ page }) => {
-  await page.goto("/");
+  await login(page);
   const card = page.getByTestId("card-card-1");
   const targetColumn = page.getByTestId("column-col-review");
   const cardBox = await card.boundingBox();
@@ -38,4 +102,45 @@ test("moves a card between columns", async ({ page }) => {
   );
   await page.mouse.up();
   await expect(targetColumn.getByTestId("card-card-1")).toBeVisible();
+});
+
+test("logs out to the sign-in screen", async ({ page }) => {
+  await login(page);
+  await page.getByRole("button", { name: /log out/i }).click();
+  await expect(
+    page.getByRole("heading", { name: /sign in to kanban studio/i })
+  ).toBeVisible();
+});
+
+test("drops a card into an empty column", async ({ page }) => {
+  const emptyReviewBoard = {
+    ...initialBoard,
+    columns: initialBoard.columns.map((column) =>
+      column.id === "col-review" ? { ...column, cardIds: [] } : column
+    ),
+    cards: Object.fromEntries(
+      Object.entries(initialBoard.cards).filter(([id]) => id !== "card-6")
+    ),
+  };
+
+  await page.request.put("/api/board?username=user", { data: emptyReviewBoard });
+
+  await login(page);
+  const emptyColumn = page.getByTestId("column-col-review");
+  await expect(emptyColumn.locator('[data-testid^="card-"]')).toHaveCount(0);
+
+  const card = page.getByTestId("card-card-1");
+  const cardBox = await card.boundingBox();
+  const columnBox = await emptyColumn.boundingBox();
+  if (!cardBox || !columnBox) {
+    throw new Error("Unable to resolve drag coordinates.");
+  }
+
+  await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(columnBox.x + columnBox.width / 2, columnBox.y + 160, {
+    steps: 12,
+  });
+  await page.mouse.up();
+  await expect(emptyColumn.getByTestId("card-card-1")).toBeVisible();
 });
