@@ -10,27 +10,10 @@ import {
   verifySession,
 } from "@/lib/auth";
 
-const withAuthHeader = (token: string) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const originalFetch = window.fetch.bind(window);
-
-  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
-    const nextInit = { ...(init ?? {}) };
-    const headers = new Headers(nextInit.headers ?? {});
-    if (!headers.has("Authorization")) {
-      headers.set("Authorization", `Bearer ${token}`);
-    }
-    nextInit.headers = headers;
-    return originalFetch(input, nextInit);
-  };
-};
-
 export const AuthShell = () => {
   const [isChecking, setIsChecking] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [username, setUsername] = useState("user");
   const [password, setPassword] = useState("password");
   const [error, setError] = useState("");
@@ -50,7 +33,7 @@ export const AuthShell = () => {
         return;
       }
 
-      withAuthHeader(token);
+      setAccessToken(token);
       setIsAuthenticated(true);
       setIsChecking(false);
     };
@@ -65,7 +48,7 @@ export const AuthShell = () => {
     try {
       const result = await login(username, password);
       storeToken(result.access_token);
-      withAuthHeader(result.access_token);
+      setAccessToken(result.access_token);
       setIsAuthenticated(true);
     } catch {
       setError("Invalid username or password.");
@@ -152,7 +135,7 @@ export const AuthShell = () => {
           Log Out
         </button>
       </div>
-      <KanbanBoard />
+      {accessToken ? <KanbanBoard accessToken={accessToken} /> : null}
     </>
   );
 };

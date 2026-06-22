@@ -2,6 +2,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AuthShell } from "@/components/AuthShell";
 
+vi.mock("@/components/KanbanBoard", () => ({
+  KanbanBoard: () => <h1>Kanban Studio</h1>,
+}));
+
 const jsonResponse = (body: unknown, ok = true) =>
   Promise.resolve({
     ok,

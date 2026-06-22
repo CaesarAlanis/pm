@@ -22,7 +22,7 @@ This index tracks the detailed plan documents for each project part.
 - [x] [Part 4 - Token-Based Sign-In MVP](./part-04-token-based-sign-in-mvp.md)
 - [x] [Part 5 - Database Modeling and Snapshot Strategy](./part-05-database-modeling-and-snapshot-strategy.md)
 - [x] [Part 6 - Backend API for Kanban Persistence](./part-06-backend-api-for-kanban-persistence.md)
-- [ ] [Part 7 - Frontend/Backend Integration](./part-07-frontend-backend-integration.md)
+- [x] [Part 7 - Frontend/Backend Integration](./part-07-frontend-backend-integration.md)
 - [ ] [Part 8 - OpenRouter Connectivity](./part-08-openrouter-connectivity.md)
 - [ ] [Part 9 - Structured AI Board Operations](./part-09-structured-ai-board-operations.md)
 - [ ] [Part 10 - AI Sidebar UX and Live Board Updates](./part-10-ai-sidebar-ux-and-live-updates.md)

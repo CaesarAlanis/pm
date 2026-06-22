@@ -4,29 +4,40 @@ const login = async (page: import("@playwright/test").Page) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Kanban Studio Login" })).toBeVisible();
   await page.getByRole("button", { name: /sign in/i }).click();
-  await expect(page.getByRole("heading", { name: "Kanban Studio" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /log out/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Kanban Studio$/ })).toBeVisible();
 };
 
 test("loads the kanban board", async ({ page }) => {
   await login(page);
   await expect(page.getByRole("heading", { name: "Kanban Studio" })).toBeVisible();
   await expect(page.locator('[data-testid^="column-"]')).toHaveCount(5);
+  await expect(page.getByText("Align roadmap themes")).toBeVisible();
 });
 
-test("adds a card to a column", async ({ page }) => {
+test("card changes persist across page reload", async ({ page }) => {
   await login(page);
+  const cardTitle = `Playwright persisted ${Date.now()}`;
   const firstColumn = page.locator('[data-testid^="column-"]').first();
   await firstColumn.getByRole("button", { name: /add a card/i }).click();
-  await firstColumn.getByPlaceholder("Card title").fill("Playwright card");
+  await firstColumn.getByPlaceholder("Card title").fill(cardTitle);
   await firstColumn.getByPlaceholder("Details").fill("Added via e2e.");
   await firstColumn.getByRole("button", { name: /add card/i }).click();
-  await expect(firstColumn.getByText("Playwright card")).toBeVisible();
+  await expect(firstColumn.getByText(cardTitle)).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Kanban Studio" })).toBeVisible();
+  const firstColumnAfterReload = page.locator('[data-testid^="column-"]').first();
+  await expect(firstColumnAfterReload.getByText(cardTitle)).toBeVisible();
 });
 
 test("moves a card between columns", async ({ page }) => {
   await login(page);
   const card = page.getByTestId("card-card-1");
-  const targetColumn = page.getByTestId("column-col-review");
+  const targetColumn = page
+    .locator('[data-testid^="column-"]')
+    .filter({ has: page.locator('input[aria-label="Column title"][value="Review"]') })
+    .first();
   const cardBox = await card.boundingBox();
   const columnBox = await targetColumn.boundingBox();
   if (!cardBox || !columnBox) {
