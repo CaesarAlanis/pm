@@ -1,37 +1,32 @@
-# High level steps for project
+# Project Plan Index
 
-Part 1: Plan
+This index tracks the detailed plan documents for each project part.
 
-Enrich this document to plan out each of these parts in detail, with substeps listed out as a checklist to be checked off by the agent, and with tests and success critieria for each. Also create an AGENTS.md file inside the frontend directory that describes the existing code there. Ensure the user checks and approves the plan.
+## Confirmed Constraints
 
-Part 2: Scaffolding
+- Runtime architecture: Next.js runtime server behind FastAPI proxy.
+- Deployment target: single Docker container with frontend, backend, and SQLite.
+- Auth approach: token-based login (MVP credentials: user / password).
+- Data model approach: normalized SQLite tables with JSON snapshot support.
+- AI model route: OpenRouter using openai/gpt-oss-120b.
+- AI chat history persistence: in-memory per active app session only.
+- Test stack: backend pytest; frontend vitest + playwright.
+- Expected run command: docker compose up.
+- Script naming: consistent cross-platform naming under scripts/.
 
-Set up the Docker infrastructure, the backend in backend/ with FastAPI, and write the start and stop scripts in the scripts/ directory. This should serve example static HTML to confirm that a 'hello world' example works running locally and also make an API call.
+## Part Documents
 
-Part 3: Add in Frontend
+- [ ] [Part 1 - Planning and Documentation](./part-01-planning-and-documentation.md)
+- [ ] [Part 2 - Scaffolding and Container Baseline](./part-02-scaffolding-and-container-baseline.md)
+- [x] [Part 3 - Integrate Frontend Runtime](./part-03-integrate-frontend-runtime.md)
+- [ ] [Part 4 - Token-Based Sign-In MVP](./part-04-token-based-sign-in-mvp.md)
+- [ ] [Part 5 - Database Modeling and Snapshot Strategy](./part-05-database-modeling-and-snapshot-strategy.md)
+- [ ] [Part 6 - Backend API for Kanban Persistence](./part-06-backend-api-for-kanban-persistence.md)
+- [ ] [Part 7 - Frontend/Backend Integration](./part-07-frontend-backend-integration.md)
+- [ ] [Part 8 - OpenRouter Connectivity](./part-08-openrouter-connectivity.md)
+- [ ] [Part 9 - Structured AI Board Operations](./part-09-structured-ai-board-operations.md)
+- [ ] [Part 10 - AI Sidebar UX and Live Board Updates](./part-10-ai-sidebar-ux-and-live-updates.md)
 
-Now update so that the frontend is statically built and served, so that the app has the demo Kanban board displayed at /. Comprehensive unit and integration tests.
+## Approval Gate
 
-Part 4: Add in a fake user sign in experience
-
-Now update so that on first hitting /, you need to log in with dummy credentials ("user", "password") in order to see the Kanban, and you can log out. Comprehensive tests.
-
-Part 5: Database modeling
-
-Now propose a database schema for the Kanban, saving it as JSON. Document the database approach in docs/ and get user sign off.
-
-Part 6: Backend
-
-Now add API routes to allow the backend to read and change the Kanban for a given user; test this thoroughly with backend unit tests. The database should be created if it doesn't exist.
-
-Part 7: Frontend + Backend
-
-Now have the frontend actually use the backend API, so that the app is a proper persistent Kanban board. Test very throughly.
-
-Part 8: AI connectivity
-
-Now allow the backend to make an AI call via OpenRouter. Test connectivity with a simple "2+2" test and ensure the AI call is working.
-
-Part 9: Now extend the backend call so that it always calls the AI with the JSON of the Kanban board, plus the user's question (and conversation history). The AI should respond with Structured Outputs that includes the response to the user and optionaly an update to the Kanban. Test thoroughly.
-
-Part 10: Now add a beautiful sidebar widget to the UI supporting full AI chat, and allowing the LLM (as it determines) to update the Kanban based on its Structured Outputs. If the AI updates the Kanban, then the UI should refresh automatically.
+User review and approval is required after Part 1 planning docs are complete and before implementation begins.
