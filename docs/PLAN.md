@@ -16,8 +16,8 @@ This index tracks the detailed plan documents for each project part.
 
 ## Part Documents
 
-- [ ] [Part 1 - Planning and Documentation](./part-01-planning-and-documentation.md)
-- [ ] [Part 2 - Scaffolding and Container Baseline](./part-02-scaffolding-and-container-baseline.md)
+- [x] [Part 1 - Planning and Documentation](./part-01-planning-and-documentation.md)
+- [x] [Part 2 - Scaffolding and Container Baseline](./part-02-scaffolding-and-container-baseline.md)
 - [x] [Part 3 - Integrate Frontend Runtime](./part-03-integrate-frontend-runtime.md)
 - [ ] [Part 4 - Token-Based Sign-In MVP](./part-04-token-based-sign-in-mvp.md)
 - [ ] [Part 5 - Database Modeling and Snapshot Strategy](./part-05-database-modeling-and-snapshot-strategy.md)

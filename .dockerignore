@@ -1,0 +1,14 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+
+frontend/node_modules
+frontend/.next
+frontend/test-results
+
+backend/.venv
+backend/__pycache__
+
+docs
