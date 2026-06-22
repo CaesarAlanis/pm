@@ -6,22 +6,22 @@ Define and document SQLite schema for normalized Kanban persistence plus JSON sn
 
 ## Checklist
 
-- [ ] Propose normalized tables:
-  - [ ] `users`
-  - [ ] `boards`
-  - [ ] `columns`
-  - [ ] `cards`
-- [ ] Define foreign keys, constraints, ordering columns, and key indexes.
-- [ ] Define JSON snapshot storage strategy (for example board-level snapshot table).
-- [ ] Define migration/bootstrap approach for first-run database creation.
-- [ ] Document schema and rationale in `docs/`.
-- [ ] Request explicit user approval of schema before coding Part 6.
+- [x] Propose normalized tables:
+  - [x] `users`
+  - [x] `boards`
+  - [x] `columns`
+  - [x] `cards`
+- [x] Define foreign keys, constraints, ordering columns, and key indexes.
+- [x] Define JSON snapshot storage strategy (for example board-level snapshot table).
+- [x] Define migration/bootstrap approach for first-run database creation.
+- [x] Document schema and rationale in `docs/`.
+- [x] Request explicit user approval of schema before coding Part 6.
 
 ## Tests
 
-- [ ] Review-based validation that schema supports required board operations.
-- [ ] Review-based validation that one user maps to one board in MVP while allowing future expansion.
-- [ ] Review-based validation that snapshots can reconstruct board state.
+- [x] Review-based validation that schema supports required board operations.
+- [x] Review-based validation that one user maps to one board in MVP while allowing future expansion.
+- [x] Review-based validation that snapshots can reconstruct board state.
 
 ## Success Criteria
 

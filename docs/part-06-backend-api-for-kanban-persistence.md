@@ -6,24 +6,24 @@ Implement backend endpoints to read and mutate Kanban data for the authenticated
 
 ## Checklist
 
-- [ ] Add SQLite initialization on backend startup if DB file does not exist.
-- [ ] Implement data access layer for normalized tables and snapshot updates.
-- [ ] Add token auth guard for Kanban endpoints.
-- [ ] Add endpoints for:
-  - [ ] Fetch board state
-  - [ ] Rename columns
-  - [ ] Create/edit/delete cards
-  - [ ] Move cards between columns
-- [ ] Ensure mutation endpoints keep normalized data and snapshot data in sync.
-- [ ] Add backend API error handling for invalid operations.
+- [x] Add SQLite initialization on backend startup if DB file does not exist.
+- [x] Implement data access layer for normalized tables and snapshot updates.
+- [x] Add token auth guard for Kanban endpoints.
+- [x] Add endpoints for:
+  - [x] Fetch board state
+  - [x] Rename columns
+  - [x] Create/edit/delete cards
+  - [x] Move cards between columns
+- [x] Ensure mutation endpoints keep normalized data and snapshot data in sync.
+- [x] Add backend API error handling for invalid operations.
 
 ## Tests
 
-- [ ] pytest: database bootstrap creates schema on empty environment.
-- [ ] pytest: authenticated board fetch returns expected shape.
-- [ ] pytest: each mutation endpoint updates database correctly.
-- [ ] pytest: unauthorized requests are rejected.
-- [ ] pytest: invalid payloads produce expected error responses.
+- [x] pytest: database bootstrap creates schema on empty environment.
+- [x] pytest: authenticated board fetch returns expected shape.
+- [x] pytest: each mutation endpoint updates database correctly.
+- [x] pytest: unauthorized requests are rejected.
+- [x] pytest: invalid payloads produce expected error responses.
 
 ## Success Criteria
 
