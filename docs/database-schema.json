@@ -1,0 +1,54 @@
+{
+  "database": {
+    "name": "pm.sqlite",
+    "engine": "sqlite",
+    "notes": "A local SQLite database is sufficient for the MVP because the app runs locally and only needs a single board per user."
+  },
+  "tables": {
+    "users": {
+      "description": "Stores the authenticated users for the MVP.",
+      "columns": [
+        { "name": "id", "type": "INTEGER", "primaryKey": true },
+        { "name": "username", "type": "TEXT", "unique": true, "nullable": false },
+        { "name": "password_hash", "type": "TEXT", "nullable": false },
+        { "name": "created_at", "type": "TEXT", "nullable": false }
+      ]
+    },
+    "boards": {
+      "description": "Stores one board per user for the MVP.",
+      "columns": [
+        { "name": "id", "type": "INTEGER", "primaryKey": true },
+        { "name": "user_id", "type": "INTEGER", "nullable": false, "references": "users.id" },
+        { "name": "title", "type": "TEXT", "nullable": false, "default": "Project Board" },
+        { "name": "created_at", "type": "TEXT", "nullable": false }
+      ]
+    },
+    "columns": {
+      "description": "Stores the fixed board columns and their order.",
+      "columns": [
+        { "name": "id", "type": "INTEGER", "primaryKey": true },
+        { "name": "board_id", "type": "INTEGER", "nullable": false, "references": "boards.id" },
+        { "name": "position", "type": "INTEGER", "nullable": false },
+        { "name": "title", "type": "TEXT", "nullable": false }
+      ]
+    },
+    "cards": {
+      "description": "Stores cards and the column they currently belong to.",
+      "columns": [
+        { "name": "id", "type": "INTEGER", "primaryKey": true },
+        { "name": "board_id", "type": "INTEGER", "nullable": false, "references": "boards.id" },
+        { "name": "column_id", "type": "INTEGER", "nullable": false, "references": "columns.id" },
+        { "name": "position", "type": "INTEGER", "nullable": false },
+        { "name": "title", "type": "TEXT", "nullable": false },
+        { "name": "details", "type": "TEXT", "nullable": false, "default": "" },
+        { "name": "created_at", "type": "TEXT", "nullable": false }
+      ]
+    }
+  },
+  "relationships": [
+    "One user has one board in the MVP.",
+    "One board has many columns.",
+    "One board has many cards.",
+    "Each card belongs to one column at a time."
+  ]
+}

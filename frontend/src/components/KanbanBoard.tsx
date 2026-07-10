@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -13,17 +13,76 @@ import {
 } from "@dnd-kit/core";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
+import { AIAssistantSidebar } from "@/components/AIAssistantSidebar";
 import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
 
-export const KanbanBoard = () => {
+type KanbanBoardProps = {
+  username?: string;
+};
+
+export const KanbanBoard = ({ username = "user" }: KanbanBoardProps) => {
   const [board, setBoard] = useState<BoardData>(() => initialData);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 },
     })
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadBoard = async () => {
+      try {
+        const response = await fetch(`/api/board/${username}`);
+        if (!response.ok) {
+          throw new Error("Failed to load board");
+        }
+        const data = await response.json();
+        if (!cancelled) {
+          setBoard(data);
+        }
+      } catch {
+        if (!cancelled) {
+          setBoard(initialData);
+        }
+      } finally {
+        if (!cancelled) {
+          setHasLoaded(true);
+        }
+      }
+    };
+
+    void loadBoard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [username]);
+
+  useEffect(() => {
+    if (!hasLoaded) {
+      return;
+    }
+
+    const persistBoard = async () => {
+      try {
+        await fetch(`/api/board/${username}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(board),
+        });
+      } catch {
+        // Ignore persistence errors in the UI so the board remains usable.
+      }
+    };
+
+    void persistBoard();
+  }, [board, hasLoaded, username]);
 
   const cardsById = useMemo(() => board.cards, [board.cards]);
 
@@ -91,6 +150,32 @@ export const KanbanBoard = () => {
 
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
 
+  const handleBoardUpdated = (updatedBoard: BoardData) => {
+    const normalizedColumns = updatedBoard.columns.map((column) => ({
+      ...column,
+      cardIds: column.cardIds.filter((cardId) => Boolean(updatedBoard.cards[cardId])),
+    }));
+
+    const referencedCardIds = new Set(
+      normalizedColumns.flatMap((column) => column.cardIds)
+    );
+    const unassignedCards = Object.values(updatedBoard.cards).filter(
+      (card) => !referencedCardIds.has(card.id)
+    );
+
+    if (unassignedCards.length > 0 && normalizedColumns.length > 0) {
+      normalizedColumns[0].cardIds = [
+        ...normalizedColumns[0].cardIds,
+        ...unassignedCards.map((card) => card.id),
+      ];
+    }
+
+    setBoard({
+      ...updatedBoard,
+      columns: normalizedColumns,
+    });
+  };
+
   return (
     <div className="relative overflow-hidden">
       <div className="pointer-events-none absolute left-0 top-0 h-[420px] w-[420px] -translate-x-1/3 -translate-y-1/3 rounded-full bg-[radial-gradient(circle,_rgba(32,157,215,0.25)_0%,_rgba(32,157,215,0.05)_55%,_transparent_70%)]" />
@@ -133,32 +218,35 @@ export const KanbanBoard = () => {
           </div>
         </header>
 
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <section className="grid gap-6 lg:grid-cols-5">
-            {board.columns.map((column) => (
-              <KanbanColumn
-                key={column.id}
-                column={column}
-                cards={column.cardIds.map((cardId) => board.cards[cardId])}
-                onRename={handleRenameColumn}
-                onAddCard={handleAddCard}
-                onDeleteCard={handleDeleteCard}
-              />
-            ))}
-          </section>
-          <DragOverlay>
-            {activeCard ? (
-              <div className="w-[260px]">
-                <KanbanCardPreview card={activeCard} />
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <section className="grid gap-6 lg:grid-cols-5">
+              {board.columns.map((column) => (
+                <KanbanColumn
+                  key={column.id}
+                  column={column}
+                  cards={column.cardIds.map((cardId) => board.cards[cardId])}
+                  onRename={handleRenameColumn}
+                  onAddCard={handleAddCard}
+                  onDeleteCard={handleDeleteCard}
+                />
+              ))}
+            </section>
+            <DragOverlay>
+              {activeCard ? (
+                <div className="w-[260px]">
+                  <KanbanCardPreview card={activeCard} />
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+          <AIAssistantSidebar username={username} onBoardUpdated={handleBoardUpdated} />
+        </div>
       </main>
     </div>
   );
