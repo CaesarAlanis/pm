@@ -166,3 +166,51 @@ export const createId = (prefix: string) => {
   const timePart = Date.now().toString(36);
   return `${prefix}-${randomPart}${timePart}`;
 };
+
+export const renameColumn = (
+  columns: Column[],
+  columnId: string,
+  title: string
+): Column[] =>
+  columns.map((column) =>
+    column.id === columnId ? { ...column, title } : column
+  );
+
+export const addCard = (
+  board: BoardData,
+  columnId: string,
+  title: string,
+  details: string
+): BoardData => {
+  const id = createId("card");
+  return {
+    ...board,
+    cards: {
+      ...board.cards,
+      [id]: { id, title, details: details || "No details yet." },
+    },
+    columns: board.columns.map((column) =>
+      column.id === columnId
+        ? { ...column, cardIds: [...column.cardIds, id] }
+        : column
+    ),
+  };
+};
+
+export const removeCard = (
+  board: BoardData,
+  columnId: string,
+  cardId: string
+): BoardData => {
+  const cards = { ...board.cards };
+  delete cards[cardId];
+  return {
+    ...board,
+    cards,
+    columns: board.columns.map((column) =>
+      column.id === columnId
+        ? { ...column, cardIds: column.cardIds.filter((id) => id !== cardId) }
+        : column
+    ),
+  };
+};
