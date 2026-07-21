@@ -5,7 +5,21 @@ import { KanbanBoard } from "@/components/KanbanBoard";
 const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
 
 describe("KanbanBoard", () => {
-  it("renders five columns", () => {
+  beforeEach(() => {
+    localStorage.setItem("pm_user", "user");
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("renders sign in screen when unauthenticated", () => {
+    localStorage.clear();
+    render(<KanbanBoard />);
+    expect(screen.getByRole("heading", { name: /sign in/i })).toBeInTheDocument();
+  });
+
+  it("renders five columns when authenticated", () => {
     render(<KanbanBoard />);
     expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
   });

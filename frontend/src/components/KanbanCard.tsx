@@ -22,7 +22,7 @@ export const KanbanCard = ({ card, onDelete }: KanbanCardProps) => {
       ref={setNodeRef}
       style={style}
       className={clsx(
-        "rounded-2xl border border-transparent bg-white px-4 py-4 shadow-[0_12px_24px_rgba(3,33,71,0.08)]",
+        "relative overflow-hidden rounded-2xl border border-transparent bg-white px-4 py-4 shadow-[0_12px_24px_rgba(3,33,71,0.08)]",
         "transition-all duration-150",
         isDragging && "opacity-60 shadow-[0_18px_32px_rgba(3,33,71,0.16)]"
       )}
@@ -30,19 +30,19 @@ export const KanbanCard = ({ card, onDelete }: KanbanCardProps) => {
       {...listeners}
       data-testid={`card-${card.id}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h4 className="font-display text-base font-semibold text-[var(--navy-dark)]">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1 pr-1">
+          <h4 className="font-display text-base font-semibold leading-snug text-[var(--navy-dark)] break-words">
             {card.title}
           </h4>
-          <p className="mt-2 text-sm leading-6 text-[var(--gray-text)]">
+          <p className="mt-2 text-sm leading-6 text-[var(--gray-text)] break-words">
             {card.details}
           </p>
         </div>
         <button
           type="button"
           onClick={() => onDelete(card.id)}
-          className="rounded-full border border-transparent px-2 py-1 text-xs font-semibold text-[var(--gray-text)] transition hover:border-[var(--stroke)] hover:text-[var(--navy-dark)]"
+          className="shrink-0 rounded-lg border border-[var(--stroke)] bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--gray-text)] transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
           aria-label={`Delete ${card.title}`}
         >
           Remove
