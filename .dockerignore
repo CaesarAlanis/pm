@@ -1,0 +1,22 @@
+# Environment & Secret files
+.env
+.env.*
+.env.local
+
+# Database & temporary files
+*.db
+*.sqlite
+data/
+
+# Dependency directories & cache
+node_modules/
+frontend/node_modules/
+frontend/.next/
+.venv/
+__pycache__/
+*.pyc
+
+# Git & System
+.git/
+.gitignore
+.DS_Store
